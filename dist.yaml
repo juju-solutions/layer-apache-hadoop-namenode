@@ -1,0 +1,20 @@
+# This file contains values that are likely to change per distribution.
+# The aim is to make it easier to update / extend the charms with
+# minimal changes to the shared code in charmhelpers.
+# Note that this file extends and overrides that in the hadoop-base
+# layer, so any value specified there can be overridden here.
+vendor: 'apache'
+ports:
+    # Ports that need to be exposed, overridden, or manually specified.
+    # Only expose ports serving a UI or external API (i.e., namenode and
+    # resourcemanager).  Communication among units within the cluster does
+    # not need ports to be explicitly opened.
+    namenode:
+        port: 8020
+    nn_webapp_http:
+        port: 50070
+        exposed_on: 'namenode'
+    # TODO: support SSL
+    #nn_webapp_https:
+    #    port: 50470
+    #    exposed_on: 'namenode'
