@@ -1,5 +1,1 @@
 includes: ['layer:hadoop-base', 'interface:hdfs']
-options:
-  hadoop-base:
-    dist_keys: ['vendor', 'hadoop_version', 'packages',
-                'groups', 'users', 'dirs', 'ports']
