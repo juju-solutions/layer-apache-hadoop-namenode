@@ -1,4 +1,4 @@
-from charms.reactive import when, when_not, set_state, is_state
+from charms.reactive import when, when_not, set_state, remove_state
 from charms.hadoop import get_hadoop_base
 from jujubigdata.handlers import HDFS
 from jujubigdata import utils
@@ -18,6 +18,25 @@ def configure_namenode():
     set_state('namenode.started')
 
 
+@when('namenode.started')
+@when_not('hdfs.datanode.connected')
+def status_blocked():
+    hookenv.status_set('blocked', 'Waiting for DataNodes')
+    remove_state('namenode.ready')
+
+
+@when('hdfs.client.connected')
+@when_not('namenode.ready')
+def send_blocked(client):
+    client.send_ready(False)
+
+
+@when('hdfs.client.connected')
+@when('namenode.ready')
+def send_ready(client):
+    client.send_ready(True)
+
+
 @when('namenode.started', 'hdfs.client.connected')
 def configure_client(hdfs_rel):
     hadoop = get_hadoop_base()
@@ -27,13 +46,6 @@ def configure_client(hdfs_rel):
     hdfs_rel.send_spec(hadoop.spec())
     hdfs_rel.send_ports(hdfs_port, webhdfs_port)
     hdfs_rel.send_hosts_map(utils.get_kv_hosts())
-    hdfs_rel.send_ready(is_state('namenode.ready'))
-
-
-@when('namenode.started')
-@when_not('hdfs.datanode.connected')
-def mark_blocked():
-    hookenv.status_set('blocked', 'Waiting for DataNodes')
 
 
 @when('namenode.started', 'hdfs.datanode.connected')
