@@ -2,7 +2,7 @@ from charms.reactive import when, when_not, set_state, remove_state
 from charms.hadoop import get_hadoop_base
 from jujubigdata.handlers import HDFS
 from jujubigdata import utils
-from charmhelpers.core import hookenv
+from charmhelpers.core import hookenv, unitdata
 
 
 @when('hadoop.installed')
@@ -54,10 +54,15 @@ def configure_datanodes(hdfs_rel):
     hdfs = HDFS(hadoop)
     datanodes = hdfs_rel.datanodes()
     slaves = [node['hostname'] for node in datanodes]
+    unitdata.kv().set('namenode.slaves', slaves)
+
     hdfs.register_slaves(slaves)
     utils.update_kv_hosts({node['ip']: node['hostname'] for node in datanodes})
     utils.manage_etc_hosts()
+
+    hdfs_rel.send_hosts_map(utils.get_kv_hosts())
     hdfs_rel.send_ssh_key(utils.get_ssh_key('ubuntu'))
+
     hookenv.status_set('active', 'Ready ({count} DataNode{s})'.format(
         count=len(datanodes),
         s='s' if len(datanodes) > 1 else '',
@@ -65,12 +70,47 @@ def configure_datanodes(hdfs_rel):
     set_state('namenode.ready')
 
 
+@when('namenode.started', 'hdfs.datanode.leaving')
+def unregister_datanode(hdfs_rel):
+    hadoop = get_hadoop_base()
+    hdfs = HDFS(hadoop)
+    nodes_leaving = hdfs_rel.datanodes()  # only returns nodes in "leaving" state
+    slaves = unitdata.kv().get('namenode.slaves')
+    slaves_leaving = [node['hostname'] for node in nodes_leaving]
+    hookenv.log('Slaves leaving: {}'.format(slaves_leaving))
+
+    slaves_remaining = list(set(slaves) ^ set(slaves_leaving))
+    unitdata.kv().set('namenode.slaves', slaves_remaining)
+
+    hdfs.register_slaves(slaves_remaining)
+    utils.remove_kv_hosts({node['ip']: node['hostname'] for node in nodes_leaving})
+    utils.manage_etc_hosts()
+
+    if not slaves_remaining:
+        hookenv.status_set('blocked', 'Waiting for DataNodes')
+        remove_state('namenode.ready')
+
+
 @when('namenode.started', 'hdfs.secondary.connected')
 def configure_secondary(hdfs_rel):
     hadoop = get_hadoop_base()
     hdfs = HDFS(hadoop)
     secondary = hdfs_rel.secondaries()[0]  # there can be only one
+
     hdfs.configure_namenode(secondary['hostname'], secondary['port'])
     utils.update_kv_host(secondary['ip'], secondary['hostname'])
     utils.manage_etc_hosts()
+
+    hdfs_rel.send_hosts_map(utils.get_kv_hosts())
     hdfs_rel.send_ssh_key(utils.get_ssh_key('ubuntu'))
+
+
+@when('namenode.started', 'hdfs.secondary.leaving')
+def unregister_secondary(hdfs_rel):
+    hadoop = get_hadoop_base()
+    hdfs = HDFS(hadoop)
+    secondary = hdfs_rel.secondaries()[0]  # there can be only one
+
+    hdfs.configure_namenode(secondary['hostname'], secondary['port'])
+    utils.remove_kv_host(secondary['ip'], secondary['hostname'])
+    utils.manage_etc_hosts()
