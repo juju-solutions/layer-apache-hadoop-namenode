@@ -5,7 +5,7 @@ distributed processing of large data sets across clusters of computers
 using a simple programming model.
 
 This charm deploys an HDFS master node running the NameNode component of
-[Apache Hadoop 2.4.1](http://hadoop.apache.org/docs/r2.4.1/), which manages
+[Apache Hadoop 2.7.1](http://hadoop.apache.org/docs/r2.7.1/), which manages
 the distribution and replication of data among the various DataNode components.
 
 ## Usage
