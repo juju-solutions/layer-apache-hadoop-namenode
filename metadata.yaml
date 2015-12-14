@@ -10,5 +10,6 @@ tags: ["applications", "bigdata", "hadoop", "apache"]
 provides:
   hdfs:
     interface: hdfs
-  ganglia:
-    interface: monitor
+requires:
+  datanode:
+    interface: datanode

@@ -1,1 +1,1 @@
-includes: ['layer:hadoop-base', 'interface:hdfs']
+includes: ['layer:hadoop-base', 'interface:datanode', 'interface:hdfs']
