@@ -34,7 +34,7 @@ def send_info(datanode):
     hdfs_port = hadoop.dist_config.port('namenode')
     webhdfs_port = hadoop.dist_config.port('nn_webapp_http')
 
-    utils.update_kv_hosts({node['ip']: node['hostname'] for node in datanode.nodes()})
+    utils.update_kv_hosts({node['ip']: node['host'] for node in datanode.nodes()})
     utils.manage_etc_hosts()
 
     datanode.send_spec(hadoop.spec())
@@ -54,7 +54,7 @@ def register_datanodes(datanode):
     hadoop = get_hadoop_base()
     hdfs = HDFS(hadoop)
 
-    slaves = [node['hostname'] for node in datanode.nodes()]
+    slaves = [node['host'] for node in datanode.nodes()]
     if data_changed('namenode.slaves', slaves):
         unitdata.kv().set('namenode.slaves', slaves)
         hdfs.register_slaves(slaves)
@@ -94,14 +94,14 @@ def unregister_datanode(datanode):
     nodes_leaving = datanode.nodes()  # only returns nodes in "leaving" state
 
     slaves = unitdata.kv().get('namenode.slaves')
-    slaves_leaving = [node['hostname'] for node in nodes_leaving]
+    slaves_leaving = [node['host'] for node in nodes_leaving]
     hookenv.log('Slaves leaving: {}'.format(slaves_leaving))
 
     slaves_remaining = list(set(slaves) ^ set(slaves_leaving))
     unitdata.kv().set('namenode.slaves', slaves_remaining)
     hdfs.register_slaves(slaves_remaining)
 
-    utils.remove_kv_hosts({node['ip']: node['hostname'] for node in nodes_leaving})
+    utils.remove_kv_hosts({node['ip']: node['host'] for node in nodes_leaving})
     utils.manage_etc_hosts()
 
     if not slaves_remaining:
