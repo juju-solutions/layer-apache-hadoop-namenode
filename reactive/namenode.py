@@ -45,7 +45,7 @@ def send_info(datanode):
     datanode.send_spec(hadoop.spec())
     datanode.send_host(local_hostname)
     datanode.send_ports(hdfs_port, webhdfs_port)
-    datanode.send_ssh_key(utils.get_ssh_key('ubuntu'))
+    datanode.send_ssh_key(utils.get_ssh_key('hdfs'))
     datanode.send_hosts_map(utils.get_kv_hosts())
 
 
