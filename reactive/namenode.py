@@ -99,7 +99,7 @@ def unregister_datanode(datanode):
     hdfs = HDFS(hadoop)
     nodes_leaving = datanode.nodes()  # only returns nodes in "leaving" state
 
-    slaves = unitdata.kv().get('namenode.slaves')
+    slaves = unitdata.kv().get('namenode.slaves', [])
     slaves_leaving = [node['host'] for node in nodes_leaving]
     hookenv.log('Slaves leaving: {}'.format(slaves_leaving))
 
@@ -107,9 +107,11 @@ def unregister_datanode(datanode):
     unitdata.kv().set('namenode.slaves', slaves_remaining)
     hdfs.register_slaves(slaves_remaining)
 
-    utils.remove_kv_hosts({node['ip']: node['host'] for node in nodes_leaving})
+    utils.remove_kv_hosts(slaves_leaving)
     utils.manage_etc_hosts()
 
     if not slaves_remaining:
         hookenv.status_set('blocked', 'Waiting for relation to DataNodes')
         remove_state('namenode.ready')
+
+    datanode.dismiss()
