@@ -43,7 +43,7 @@ def send_info(datanode):
     utils.manage_etc_hosts()
 
     datanode.send_spec(hadoop.spec())
-    datanode.send_host(local_hostname)
+    datanode.send_namenodes([local_hostname])
     datanode.send_ports(hdfs_port, webhdfs_port)
     datanode.send_ssh_key(utils.get_ssh_key('hdfs'))
     datanode.send_hosts_map(utils.get_kv_hosts())
@@ -76,14 +76,16 @@ def register_datanodes(datanode):
 @when('namenode.ready')
 def accept_clients(clients):
     hadoop = get_hadoop_base()
+    local_hostname = hookenv.local_unit().replace('/', '-')
     private_address = hookenv.unit_get('private-address')
     ip_addr = utils.resolve_private_address(private_address)
     hdfs_port = hadoop.dist_config.port('namenode')
     webhdfs_port = hadoop.dist_config.port('nn_webapp_http')
 
     clients.send_spec(hadoop.spec())
-    clients.send_ip_addr(ip_addr)
+    clients.send_namenodes([local_hostname])
     clients.send_ports(hdfs_port, webhdfs_port)
+    clients.send_hosts_map({ip_addr: local_hostname})
     clients.send_ready(True)
 
 
