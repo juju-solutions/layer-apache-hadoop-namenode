@@ -35,6 +35,7 @@ def blocked():
 @when('namenode.started', 'datanode.related')
 def send_info(datanode):
     hadoop = get_hadoop_base()
+    hdfs = HDFS(hadoop)
     local_hostname = hookenv.local_unit().replace('/', '-')
     hdfs_port = hadoop.dist_config.port('namenode')
     webhdfs_port = hadoop.dist_config.port('nn_webapp_http')
@@ -48,18 +49,6 @@ def send_info(datanode):
     datanode.send_ssh_key(utils.get_ssh_key('hdfs'))
     datanode.send_hosts_map(utils.get_kv_hosts())
 
-
-@when('namenode.started', 'datanode.related')
-@when_not('datanode.registered')
-def waiting(datanode):  # pylint: disable=unused-argument
-    hookenv.status_set('waiting', 'Waiting for DataNodes')
-
-
-@when('namenode.started', 'datanode.registered')
-def register_datanodes(datanode):
-    hadoop = get_hadoop_base()
-    hdfs = HDFS(hadoop)
-
     slaves = [node['host'] for node in datanode.nodes()]
     if data_changed('namenode.slaves', slaves):
         unitdata.kv().set('namenode.slaves', slaves)
@@ -72,24 +61,22 @@ def register_datanodes(datanode):
     set_state('namenode.ready')
 
 
-@when('hdfs.related')
+@when('namenode.clients')
 @when('namenode.ready')
 def accept_clients(clients):
     hadoop = get_hadoop_base()
     local_hostname = hookenv.local_unit().replace('/', '-')
-    private_address = hookenv.unit_get('private-address')
-    ip_addr = utils.resolve_private_address(private_address)
     hdfs_port = hadoop.dist_config.port('namenode')
     webhdfs_port = hadoop.dist_config.port('nn_webapp_http')
 
     clients.send_spec(hadoop.spec())
     clients.send_namenodes([local_hostname])
     clients.send_ports(hdfs_port, webhdfs_port)
-    clients.send_hosts_map({ip_addr: local_hostname})
+    clients.send_hosts_map(utils.get_kv_hosts())
     clients.send_ready(True)
 
 
-@when('hdfs.related')
+@when('namenode.clients')
 @when_not('namenode.ready')
 def reject_clients(clients):
     clients.send_ready(False)
