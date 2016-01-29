@@ -92,7 +92,7 @@ def unregister_datanode(datanode):
     slaves_leaving = [node['host'] for node in nodes_leaving]
     hookenv.log('Slaves leaving: {}'.format(slaves_leaving))
 
-    slaves_remaining = list(set(slaves) ^ set(slaves_leaving))
+    slaves_remaining = list(set(slaves) - set(slaves_leaving))
     unitdata.kv().set('namenode.slaves', slaves_remaining)
     hdfs.register_slaves(slaves_remaining)
 
