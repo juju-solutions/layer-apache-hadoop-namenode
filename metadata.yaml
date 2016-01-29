@@ -15,3 +15,6 @@ provides:
 requires:
   datanode:
     interface: dfs-slave
+peers:
+  hdfscluster:
+    interface: hdfscluster
