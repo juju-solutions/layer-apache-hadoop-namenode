@@ -15,3 +15,8 @@ provides:
 requires:
   datanode:
     interface: dfs-slave
+  zookeeper:
+    interface: zookeeper
+peers:
+  namenode-cluster:
+    interface: namenode-cluster

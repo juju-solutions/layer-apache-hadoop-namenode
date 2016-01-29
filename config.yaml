@@ -1,0 +1,7 @@
+options:
+    journalnode_quorum_size:
+        type: int
+        default: 3
+        description: |
+             Minimum number of journalnodes that must be ready before the shared
+             edits dir will be initialized (aka formatted) on each journalnode.
