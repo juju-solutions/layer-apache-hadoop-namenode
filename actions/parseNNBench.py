@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Simple script to parse terasort transaction results
+Simple script to parse nnbench transaction results
 and reformat them as JSON for sending back to juju
 """
 import sys
@@ -9,9 +9,9 @@ from charmhelpers.core import hookenv
 import re
 
 
-def parse_terasort_output():
+def parse_nnbench_output():
     """
-    Parse the output from terasort and set the action results:
+    Parse the output from nnbench and set the action results:
 
     """
 
@@ -26,4 +26,4 @@ def parse_terasort_output():
     hookenv.action_set({"results.raw": json.dumps(results)})
 
 if __name__ == "__main__":
-    parse_terasort_output()
+    parse_nnbench_output()
