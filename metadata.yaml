@@ -10,6 +10,8 @@ tags: ["applications", "bigdata", "hadoop", "apache"]
 provides:
   namenode:
     interface: dfs
+  benchmark:
+    interface: benchmark
 requires:
   datanode:
     interface: dfs-slave
