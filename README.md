@@ -26,6 +26,43 @@ included in the bigdata bundles linked above:
     juju ssh plugin/0
     hadoop jar my-job.jar
 
+## Benchmarking
+
+You can perform a namenode benchmark (nnbench), in order to test your namenode system and configuration
+
+        $ juju action do namenode/0 nnbench
+        Action queued with id: 55887b40-116c-4020-8b35-1e28a54cc622
+        $ juju action fetch --wait 0 55887b40-116c-4020-8b35-1e28a54cc622
+        
+        results:
+          meta:
+            composite:
+              direction: asc
+              units: secs
+              value: "128"
+            start: 2016-02-04T14:55:39Z
+            stop: 2016-02-04T14:57:47Z
+          results:
+            raw: '{"BAD_ID": "0", "FILE: Number of read operations": "0", "Reduce input groups":
+              "8", "Reduce input records": "95", "Map output bytes": "1823", "Map input records":
+              "12", "Combine input records": "0", "HDFS: Number of bytes read": "18635", "FILE:
+              Number of bytes written": "32999982", "HDFS: Number of write operations": "330",
+              "Combine output records": "0", "Total committed heap usage (bytes)": "3144749056",
+              "Bytes Written": "164", "WRONG_LENGTH": "0", "Failed Shuffles": "0", "FILE:
+              Number of bytes read": "27879457", "WRONG_MAP": "0", "Spilled Records": "190",
+              "Merged Map outputs": "72", "HDFS: Number of large read operations": "0", "Reduce
+              shuffle bytes": "2445", "FILE: Number of large read operations": "0", "Map output
+              materialized bytes": "2445", "IO_ERROR": "0", "CONNECTION": "0", "HDFS: Number
+              of read operations": "567", "Map output records": "95", "Reduce output records":
+              "8", "WRONG_REDUCE": "0", "HDFS: Number of bytes written": "27412", "GC time
+              elapsed (ms)": "603", "Input split bytes": "1610", "Shuffled Maps ": "72", "FILE:
+              Number of write operations": "0", "Bytes Read": "1490"}'
+        status: completed
+        timing:
+          completed: 2016-02-04 14:57:48 +0000 UTC
+          enqueued: 2016-02-04 14:55:14 +0000 UTC
+          started: 2016-02-04 14:55:27 +0000 UTC
+
 
 ## Status and Smoke Test
 

@@ -104,3 +104,8 @@ def unregister_datanode(datanode):
         remove_state('namenode.ready')
 
     datanode.dismiss()
+
+@when('benchmark.related')
+def register_benchmarks(benchmark):
+    benchmark.register('nnbench', 'testdfsio')
+
