@@ -16,5 +16,5 @@ requires:
   datanode:
     interface: dfs-slave
 peers:
-  hdfscluster:
-    interface: hdfscluster
+  namenode-cluster:
+    interface: namenode-cluster
