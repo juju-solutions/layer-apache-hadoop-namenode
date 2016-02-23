@@ -45,6 +45,7 @@ def send_info(datanode):
     utils.manage_etc_hosts()
 
     datanode.send_spec(hadoop.spec())
+    datanode.send_clustername(hookenv.service_name())
     datanode.send_namenodes([local_hostname])
     datanode.send_ports(hdfs_port, webhdfs_port)
     datanode.send_ssh_key(utils.get_ssh_key('hdfs'))
@@ -54,7 +55,7 @@ def send_info(datanode):
     if data_changed('namenode.slaves', slaves):
         unitdata.kv().set('namenode.slaves', slaves)
         hdfs.register_slaves(slaves)
-        hdfs.refresh_slaves()
+        hdfs.reload_slaves()
 
     hookenv.status_set('active', 'Ready ({count} DataNode{s})'.format(
         count=len(slaves),
@@ -73,6 +74,7 @@ def configure_ha(cluster, datanode):
     if data_changed('namenode.ha', [cluster_nodes, jn_nodes, jn_port]):
         utils.update_kv_hosts(cluster.hosts_map())
         utils.manage_etc_hosts()
+        hdfs.configure_namenode(cluster_nodes)
         hdfs.register_journalnodes(jn_nodes, jn_port)
         hdfs.restart_namenode()
         datanode.send_namenodes(cluster_nodes)
@@ -106,10 +108,9 @@ def reject_clients(clients):
 def unregister_datanode(datanode):
     hadoop = get_hadoop_base()
     hdfs = HDFS(hadoop)
-    nodes_leaving = datanode.nodes()  # only returns nodes in "leaving" state
 
     slaves = unitdata.kv().get('namenode.slaves', [])
-    slaves_leaving = [node['host'] for node in nodes_leaving]
+    slaves_leaving = datanode.nodes()  # only returns nodes in "leaving" state
     hookenv.log('Slaves leaving: {}'.format(slaves_leaving))
 
     slaves_remaining = list(set(slaves) - set(slaves_leaving))
