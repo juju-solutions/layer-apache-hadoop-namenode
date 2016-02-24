@@ -81,10 +81,11 @@ def configure_ha(cluster, datanode):
         datanode.send_namenodes(cluster_nodes)
         if is_leader:
             hdfs.restart_namenode()
-            if not is_state('namenode.shared-edits.init'):
+            if len(jn_nodes) > 2 and not is_state('namenode.shared-edits.init'):
                 hdfs.init_sharededits()
                 set_state('namenode.shared-edits.init')
-
+        if not is_leader and len(jn_nodes) > 2:
+            hdfs.restart_namenode()
 
 @when('namenode.clients')
 @when('namenode.ready')
