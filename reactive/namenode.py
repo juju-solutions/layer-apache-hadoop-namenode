@@ -86,7 +86,9 @@ def configure_ha(cluster, datanode):
                 hdfs.init_sharededits()
                 set_state('namenode.shared-edits.init')
         if not hookenv.is_leader and len(jn_nodes) > 2:
-            hdfs.bootstrap_standby()
+            if not is_state('namenode.standby.bootstrapped'):
+                hdfs.bootstrap_standby()
+                set_state('namenode.standby.bootstrapped')
             hdfs.restart_namenode()
 
 @when('namenode.clients')
