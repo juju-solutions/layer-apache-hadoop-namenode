@@ -72,6 +72,7 @@ def configure_ha(cluster, datanode):
     cluster_nodes = cluster.nodes()
     jn_nodes = datanode.nodes()
     jn_port = datanode.jn_port()
+    local_hostname = hookenv.local_unit().replace('/', '-')
     if data_changed('namenode.ha', [cluster_nodes, jn_nodes, jn_port]):
         utils.update_kv_hosts(cluster.hosts_map())
         utils.manage_etc_hosts()
