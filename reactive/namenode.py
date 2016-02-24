@@ -22,7 +22,9 @@ def configure_namenode():
     hdfs.format_namenode()
     if hookenv.is_leader():
         hdfs.start_namenode()
-    hdfs.create_hdfs_dirs()
+        if not hookenv.leader_get('hdfs.initialized'):
+            hdfs.create_hdfs_dirs()
+            hookenv.leader_set('hdfs.initialized', True)
     hadoop.open_ports('namenode')
     utils.update_kv_hosts({ip_addr: local_hostname})
     set_state('namenode.started')
@@ -81,8 +83,8 @@ def configure_ha(cluster, datanode):
             hdfs.register_journalnodes(jn_nodes, jn_port)
         datanode.send_namenodes(cluster_nodes)
         if hookenv.is_leader():
+            hdfs.stop_namenode()
             if len(jn_nodes) > 2 and not is_state('namenode.shared-edits.init'):
-                hdfs.stop_namenode()
                 hdfs.init_sharededits()
                 set_state('namenode.shared-edits.init')
                 hdfs.start_namenode()
@@ -95,7 +97,7 @@ def configure_ha(cluster, datanode):
             if not is_state('namenode.standby.bootstrapped'):
                 hdfs.bootstrap_standby()
                 set_state('namenode.standby.bootstrapped')
-            hdfs.restart_namenode()
+            hdfs.start_namenode()
         elif not hookenv.is_leader() and len(jn_nodes) < 3:
             hookenv.status_set('blocked', 'Waiting for 3 slaves to initialize HDFS HA')
 
