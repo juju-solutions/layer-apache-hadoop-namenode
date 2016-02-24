@@ -96,6 +96,9 @@ def configure_ha(cluster, datanode):
                 hdfs.bootstrap_standby()
                 set_state('namenode.standby.bootstrapped')
             hdfs.restart_namenode()
+        elif not hookenv.is_leader() and len(jn_nodes) < 3:
+            hookenv.status_set('blocked', 'Waiting for 3 slaves to initialize HDFS HA')
+
 
 @when('namenode.clients')
 @when('namenode.ready')
