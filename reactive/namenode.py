@@ -80,6 +80,7 @@ def configure_ha(cluster, datanode):
             hdfs.register_journalnodes(jn_nodes, jn_port)
         datanode.send_namenodes(cluster_nodes)
         if hookenv.is_leader:
+            hdfs.transition_to_active()
             hdfs.restart_namenode()
             if len(jn_nodes) > 2 and not is_state('namenode.shared-edits.init'):
                 hdfs.init_sharededits()
