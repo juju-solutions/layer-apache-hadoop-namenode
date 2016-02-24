@@ -90,7 +90,7 @@ def configure_ha(cluster, datanode):
                 # 'leader' appears to transition back to standby after restart - test more
                 hdfs.transition_to_active([local_hostname])
         if not hookenv.is_leader and len(jn_nodes) > 2:
-            if not is_state('namenode.standby.bootstrapped'):
+            if not is_state('namenode.standby.bootstrapped') and is_state('namenode.shared-edits.init'):
                 hdfs.bootstrap_standby()
                 set_state('namenode.standby.bootstrapped')
             hdfs.restart_namenode()
