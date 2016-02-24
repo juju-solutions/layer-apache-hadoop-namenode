@@ -7,7 +7,7 @@ from charms.reactive.helpers import data_changed
 from charms.layer.hadoop_base import get_hadoop_base
 from jujubigdata.handlers import HDFS
 from jujubigdata import utils
-from charmhelpers.core import hookenv, unitdata
+from charmhelpers.core import hookenv, unitdata, is_leader
 
 
 @when('hadoop.installed')
@@ -20,7 +20,8 @@ def configure_namenode():
     hdfs = HDFS(hadoop)
     hdfs.configure_namenode([local_hostname])
     hdfs.format_namenode()
-    hdfs.start_namenode()
+    if is_leader:
+        hdfs.start_namenode()
     hdfs.create_hdfs_dirs()
     hadoop.open_ports('namenode')
     utils.update_kv_hosts({ip_addr: local_hostname})
@@ -75,12 +76,14 @@ def configure_ha(cluster, datanode):
         utils.update_kv_hosts(cluster.hosts_map())
         utils.manage_etc_hosts()
         hdfs.configure_namenode(cluster_nodes)
-        hdfs.register_journalnodes(jn_nodes, jn_port)
-        hdfs.restart_namenode()
+        if len(jn_nodes) > 2:
+            hdfs.register_journalnodes(jn_nodes, jn_port)
         datanode.send_namenodes(cluster_nodes)
-        if not is_state('namenode.shared-edits.init'):
-            hdfs.init_sharededits()
-            set_state('namenode.shared-edits.init')
+        if is_leader:
+            hdfs.restart_namenode()
+            if not is_state('namenode.shared-edits.init'):
+                hdfs.init_sharededits()
+                set_state('namenode.shared-edits.init')
 
 
 @when('namenode.clients')
