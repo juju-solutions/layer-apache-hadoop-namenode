@@ -7,7 +7,7 @@ from charms.reactive.helpers import data_changed
 from charms.layer.hadoop_base import get_hadoop_base
 from jujubigdata.handlers import HDFS
 from jujubigdata import utils
-from charmhelpers.core import hookenv, unitdata, is_leader
+from charmhelpers.core import hookenv, unitdata
 
 
 @when('hadoop.installed')
@@ -20,7 +20,7 @@ def configure_namenode():
     hdfs = HDFS(hadoop)
     hdfs.configure_namenode([local_hostname])
     hdfs.format_namenode()
-    if is_leader:
+    if hookenv.is_leader:
         hdfs.start_namenode()
     hdfs.create_hdfs_dirs()
     hadoop.open_ports('namenode')
@@ -79,12 +79,12 @@ def configure_ha(cluster, datanode):
         if len(jn_nodes) > 2:
             hdfs.register_journalnodes(jn_nodes, jn_port)
         datanode.send_namenodes(cluster_nodes)
-        if is_leader:
+        if hookenv.is_leader:
             hdfs.restart_namenode()
             if len(jn_nodes) > 2 and not is_state('namenode.shared-edits.init'):
                 hdfs.init_sharededits()
                 set_state('namenode.shared-edits.init')
-        if not is_leader and len(jn_nodes) > 2:
+        if not hookenv.is_leader and len(jn_nodes) > 2:
             hdfs.restart_namenode()
 
 @when('namenode.clients')
