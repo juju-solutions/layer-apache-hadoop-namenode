@@ -23,7 +23,7 @@ def configure_namenode():
     if hookenv.is_leader():
         hdfs.start_namenode()
         try:
-            hookenv.leader_get('hdfs_initalized'):
+            hookenv.leader_get('hdfs_initalized')
         except NameError:
             hookenv.leader_set(hdfs_initialized='False') 
         if hookenv.leader_get('hdfs_initialized') == 'False':
