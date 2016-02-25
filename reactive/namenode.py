@@ -54,11 +54,11 @@ def send_info(datanode):
     datanode.send_spec(hadoop.spec())
     datanode.send_clustername(hookenv.service_name())
     try:
-        hookenv.leader_get('hdfs_HA_initialized')
+        if not hookenv.leader_get('hdfs_HA_initialized') == 'True':
+            datanode.send_namenodes([local_hostname])
     except NameError:
-        hookenv.leader_set(hdfs_HA_initialized='False')
-    if hookenv.leader_get('hdfs_HA_initialized') == 'False':
-        datanode.send_namenodes([local_hostname])
+            datanode.send_namenodes([local_hostname])
+        return
     datanode.send_ports(hdfs_port, webhdfs_port)
     datanode.send_ssh_key(utils.get_ssh_key('hdfs'))
     datanode.send_hosts_map(utils.get_kv_hosts())
