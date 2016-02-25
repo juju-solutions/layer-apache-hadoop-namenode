@@ -100,7 +100,7 @@ def configure_ha(cluster, datanode):
                 hdfs.init_sharededits()
                 set_state('namenode.shared-edits.init')
                 # 'leader' appears to transition back to standby after restart - test more
-        else:
+        elif not hookenv.is_leader():
             if len(jn_nodes) > 2:
                 if not is_state('namenode.standby.bootstrapped'):
                     hdfs.format_namenode()
