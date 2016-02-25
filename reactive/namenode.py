@@ -117,7 +117,7 @@ def configure_ha(cluster, datanode):
 if hookenv.is_leader():
     @when('namenode-cluster.joined', 'datanode.journalnode.ha')
     @when_not('zookeeper.joined')
-    def ensure_active(cluster):
+    def ensure_active(cluster, datanode):
         '''
         If we enable HA before zookeeper is connected, we need to at least
         ensure that one namenode is active and one is standby to ensure that
