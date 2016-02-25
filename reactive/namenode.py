@@ -22,9 +22,9 @@ def configure_namenode():
     hdfs.format_namenode()
     if hookenv.is_leader():
         hdfs.start_namenode()
-        if not hookenv.leader_get('hdfs.initialized'):
+        if not hookenv.leader_get(hdfs.initialized):
             hdfs.create_hdfs_dirs()
-            hookenv.leader_set('hdfs.initialized', True)
+            hookenv.leader_set(hdfs.initialized='True')
     hadoop.open_ports('namenode')
     utils.update_kv_hosts({ip_addr: local_hostname})
     set_state('namenode.started')
@@ -49,7 +49,7 @@ def send_info(datanode):
 
     datanode.send_spec(hadoop.spec())
     datanode.send_clustername(hookenv.service_name())
-    if not hookenv.leader_get('hdfs.HA.initialized'):
+    if not hookenv.leader_get(hdfs.HA.initialized):
         datanode.send_namenodes([local_hostname])
     datanode.send_ports(hdfs_port, webhdfs_port)
     datanode.send_ssh_key(utils.get_ssh_key('hdfs'))
@@ -76,7 +76,7 @@ def configure_ha(cluster, datanode):
     jn_nodes = datanode.nodes()
     jn_port = datanode.jn_port()
     local_hostname = hookenv.local_unit().replace('/', '-')
-    hookenv.leader_set('hdfs.HA.initialized', True)
+    hookenv.leader_set(hdfs.HA.initialized='True')
     set_state('hdfs.HA.initialized', True)
     if data_changed('namenode.ha', [cluster_nodes, jn_nodes, jn_port]):
         utils.update_kv_hosts(cluster.hosts_map())
