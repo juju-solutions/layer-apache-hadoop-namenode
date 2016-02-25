@@ -22,7 +22,11 @@ def configure_namenode():
     hdfs.format_namenode()
     if hookenv.is_leader():
         hdfs.start_namenode()
-        if not hookenv.leader_get(hdfs_initialized):
+        try:
+            hdfs_initialized = hookenv.leader_get('hdfs_initalized'):
+        except NameError:
+            hookenv.leader_set(hdfs_initialized='False') 
+        if hookenv.leader_get('hdfs_initialized') == 'False':
             hdfs.create_hdfs_dirs()
             hookenv.leader_set(hdfs_initialized='True')
     hadoop.open_ports('namenode')
@@ -49,7 +53,11 @@ def send_info(datanode):
 
     datanode.send_spec(hadoop.spec())
     datanode.send_clustername(hookenv.service_name())
-    if not hookenv.leader_get(hdfs_HA_initialized):
+    try:
+        hdfs_HA_initialized = hookenv.leader_get('hdfs_HA_initialized')
+    except NameError:
+        hookenv.leader_set(hdfs_HA_initialized='False')
+    if hookenv.leader_get('hdfs_HA_initialized') == 'False':
         datanode.send_namenodes([local_hostname])
     datanode.send_ports(hdfs_port, webhdfs_port)
     datanode.send_ssh_key(utils.get_ssh_key('hdfs'))
