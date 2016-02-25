@@ -100,34 +100,36 @@ def configure_ha(cluster, datanode):
                 hdfs.init_sharededits()
                 set_state('namenode.shared-edits.init')
                 # 'leader' appears to transition back to standby after restart - test more
-            hdfs.ensure_HA_active(cluster_nodes, local_hostname)
         else:
             if len(jn_nodes) > 2:
                 if not is_state('namenode.standby.bootstrapped'):
                     hdfs.format_namenode()
+                    # if this bootstrap happens before the master starts there will be an error
+                    # FIX
                     hdfs.bootstrap_standby()
                     set_state('namenode.standby.bootstrapped')
             else:
                 hookenv.status_set('blocked', 'Waiting for 3 slaves to initialize HDFS HA')
-            hdfs.ensure_HA_active(cluster_nodes, local_hostname)
         hdfs.start_namenode()
+        if hookenv.is_leader():
+            hdfs.ensure_HA_active(cluster_nodes, local_hostname)
 
 
-if hookenv.is_leader():
-    @when('namenode-cluster.joined', 'datanode.journalnode.ha')
-    @when_not('zookeeper.joined')
-    def ensure_active(cluster, datanode):
-        '''
-        If we enable HA before zookeeper is connected, we need to at least
-        ensure that one namenode is active and one is standby to ensure that
-        hdfs is functional
-        '''
-        hadoop = get_hadoop_base()
-        hdfs = HDFS(hadoop)
-        local_hostname = hookenv.local_unit().replace('/', '-')
-        hookenv.log('Zookeeper not related, failovers will not be automatic')
-        cluster_nodes = cluster.nodes()
-        hdfs.ensure_HA_active(cluster_nodes, local_hostname)
+#if hookenv.is_leader():
+#    @when('namenode-cluster.joined', 'datanode.journalnode.ha')
+#    @when_not('zookeeper.joined')
+#    def ensure_active(cluster, datanode):
+#        '''
+#        If we enable HA before zookeeper is connected, we need to at least
+#        ensure that one namenode is active and one is standby to ensure that
+#        hdfs is functional
+#        '''
+#        hadoop = get_hadoop_base()
+#        hdfs = HDFS(hadoop)
+#        local_hostname = hookenv.local_unit().replace('/', '-')
+#        hookenv.log('Zookeeper not related, failovers will not be automatic')
+#        cluster_nodes = cluster.nodes()
+#        hdfs.ensure_HA_active(cluster_nodes, local_hostname)
 
 
 @when('namenode.clients')
