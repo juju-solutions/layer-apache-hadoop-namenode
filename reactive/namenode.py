@@ -49,7 +49,8 @@ def send_info(datanode):
 
     datanode.send_spec(hadoop.spec())
     datanode.send_clustername(hookenv.service_name())
-    datanode.send_namenodes([local_hostname])
+    if not hookenv.leader_get('hdfs.HA.initialized'):
+        datanode.send_namenodes([local_hostname])
     datanode.send_ports(hdfs_port, webhdfs_port)
     datanode.send_ssh_key(utils.get_ssh_key('hdfs'))
     datanode.send_hosts_map(utils.get_kv_hosts())
@@ -75,6 +76,8 @@ def configure_ha(cluster, datanode):
     jn_nodes = datanode.nodes()
     jn_port = datanode.jn_port()
     local_hostname = hookenv.local_unit().replace('/', '-')
+    hookenv.leader_set('hdfs.HA.initialized', True)
+    set_state('hdfs.HA.initialized', True)
     if data_changed('namenode.ha', [cluster_nodes, jn_nodes, jn_port]):
         utils.update_kv_hosts(cluster.hosts_map())
         utils.manage_etc_hosts()
@@ -89,17 +92,35 @@ def configure_ha(cluster, datanode):
                 set_state('namenode.shared-edits.init')
                 hdfs.start_namenode()
                 # 'leader' appears to transition back to standby after restart - test more
-                hdfs.transition_to_active([local_hostname])
+                hdfs.ensure_HA_active(cluster_nodes, local_hostname)
             else:
-                hdfs.restart_namenode()
-                hdfs.transition_to_active([local_hostname])
-        if not hookenv.is_leader() and len(jn_nodes) > 2:
-            if not is_state('namenode.standby.bootstrapped'):
-                hdfs.bootstrap_standby()
-                set_state('namenode.standby.bootstrapped')
-            hdfs.start_namenode()
-        elif not hookenv.is_leader() and len(jn_nodes) < 3:
-            hookenv.status_set('blocked', 'Waiting for 3 slaves to initialize HDFS HA')
+                hdfs.start_namenode()
+                hdfs.ensure_HA_active(cluster_nodes, local_hostname)
+        else:
+            if len(jn_nodes) > 2:
+                if not is_state('namenode.standby.bootstrapped'):
+                    hdfs.bootstrap_standby()
+                    set_state('namenode.standby.bootstrapped')
+                hdfs.start_namenode()
+            else:
+                hookenv.status_set('blocked', 'Waiting for 3 slaves to initialize HDFS HA')
+
+
+if hookenv.is_leader():
+    @when('hdfs.HA.initialized')
+    @when_not('zookeeper.joined')
+    def ensure_active(cluster):
+        '''
+        If we enable HA before zookeeper is connected, we need to at least
+        ensure that one namenode is active and one is standby to ensure that
+        hdfs is functional
+        '''
+        hadoop = get_hadoop_base()
+        hdfs = HDFS(hadoop)
+        local_hostname = hookenv.local_unit().replace('/', '-')
+        hookenv.log('Zookeeper not related, failovers will not be automatic')
+        cluster_nodes = cluster.nodes()
+        hdfs.ensure_HA_active(cluster_nodes, local_hostname)
 
 
 @when('namenode.clients')
@@ -111,6 +132,7 @@ def accept_clients(clients):
     webhdfs_port = hadoop.dist_config.port('nn_webapp_http')
 
     clients.send_spec(hadoop.spec())
+    # How to handle send_namenodes here?
     clients.send_namenodes([local_hostname])
     clients.send_ports(hdfs_port, webhdfs_port)
     clients.send_hosts_map(utils.get_kv_hosts())
