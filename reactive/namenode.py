@@ -20,8 +20,8 @@ def configure_namenode():
     hdfs = HDFS(hadoop)
     hdfs.configure_namenode([local_hostname])
     hdfs.format_namenode()
+    hdfs.start_namenode()
     if hookenv.is_leader():
-        hdfs.start_namenode()
         try:
             hookenv.leader_get('hdfs_initalized')
         except NameError:
@@ -85,7 +85,7 @@ def configure_ha(cluster, datanode):
     jn_port = datanode.jn_port()
     local_hostname = hookenv.local_unit().replace('/', '-')
     hookenv.leader_set(hdfs_HA_initialized='True')
-    set_state('hdfs.HA.initialized', True)
+    #set_state('hdfs.HA.initialized', True)
     if data_changed('namenode.ha', [cluster_nodes, jn_nodes, jn_port]):
         utils.update_kv_hosts(cluster.hosts_map())
         utils.manage_etc_hosts()
@@ -93,25 +93,23 @@ def configure_ha(cluster, datanode):
         if len(jn_nodes) > 2:
             hdfs.register_journalnodes(jn_nodes, jn_port)
         datanode.send_namenodes(cluster_nodes)
+        hdfs.stop_namenode()
         if hookenv.is_leader():
-            hdfs.stop_namenode()
             if len(jn_nodes) > 2 and not is_state('namenode.shared-edits.init'):
                 hdfs.init_sharededits()
                 set_state('namenode.shared-edits.init')
-                hdfs.start_namenode()
                 # 'leader' appears to transition back to standby after restart - test more
-                hdfs.ensure_HA_active(cluster_nodes, local_hostname)
-            else:
-                hdfs.start_namenode()
-                hdfs.ensure_HA_active(cluster_nodes, local_hostname)
+            hdfs.ensure_HA_active(cluster_nodes, local_hostname)
         else:
             if len(jn_nodes) > 2:
                 if not is_state('namenode.standby.bootstrapped'):
+                    hdfs.format_namenode()
                     hdfs.bootstrap_standby()
                     set_state('namenode.standby.bootstrapped')
-                hdfs.start_namenode()
             else:
                 hookenv.status_set('blocked', 'Waiting for 3 slaves to initialize HDFS HA')
+            hdfs.ensure_HA_active(cluster_nodes, local_hostname)
+        hdfs.start_namenode()
 
 
 if hookenv.is_leader():
