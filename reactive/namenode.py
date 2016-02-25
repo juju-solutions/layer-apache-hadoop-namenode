@@ -115,7 +115,7 @@ def configure_ha(cluster, datanode):
 
 
 if hookenv.is_leader():
-    @when('hdfs.HA.initialized')
+    @when('namenode-cluster.joined', 'datanode.journalnode.ha')
     @when_not('zookeeper.joined')
     def ensure_active(cluster):
         '''
