@@ -84,7 +84,8 @@ def configure_ha(cluster, datanode):
     jn_nodes = datanode.nodes()
     jn_port = datanode.jn_port()
     local_hostname = hookenv.local_unit().replace('/', '-')
-    hookenv.leader_set(hdfs_HA_initialized='True')
+    if hookenv.is_leader():
+        hookenv.leader_set(hdfs_HA_initialized='True')
     #set_state('hdfs.HA.initialized', True)
     if data_changed('namenode.ha', [cluster_nodes, jn_nodes, jn_port]):
         utils.update_kv_hosts(cluster.hosts_map())
