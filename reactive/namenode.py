@@ -23,7 +23,7 @@ def configure_namenode():
     if hookenv.is_leader():
         hdfs.start_namenode()
         try:
-            hdfs_initialized = hookenv.leader_get('hdfs_initalized'):
+            hookenv.leader_get('hdfs_initalized'):
         except NameError:
             hookenv.leader_set(hdfs_initialized='False') 
         if hookenv.leader_get('hdfs_initialized') == 'False':
@@ -54,7 +54,7 @@ def send_info(datanode):
     datanode.send_spec(hadoop.spec())
     datanode.send_clustername(hookenv.service_name())
     try:
-        hdfs_HA_initialized = hookenv.leader_get('hdfs_HA_initialized')
+        hookenv.leader_get('hdfs_HA_initialized')
     except NameError:
         hookenv.leader_set(hdfs_HA_initialized='False')
     if hookenv.leader_get('hdfs_HA_initialized') == 'False':
