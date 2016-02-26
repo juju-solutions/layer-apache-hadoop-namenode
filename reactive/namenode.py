@@ -40,7 +40,18 @@ def blocked():
     hookenv.status_set('blocked', 'Waiting for relation to DataNodes')
 
 
+@when('namenode-cluster.joined')
+def hdfs_HA_degraded(cluster, *args):
+    hadoop = get_hadoop_base()
+    hdfs_port = hadoop.dist_config.port('namenode')
+    if cluster.check_peer_hdfs(hdfs_port):
+        set_state('hdfs.degraded')
+    else:
+        remove_state('hdfs.degraded')
+
+
 @when('namenode.started', 'datanode.related')
+@when_not('hdfs.degraded')
 def send_info(datanode):
     hadoop = get_hadoop_base()
     hdfs = HDFS(hadoop)
@@ -88,15 +99,6 @@ def wait_for_leader(*args):
             hookenv.leader_set(leader_elected='True')
 
 
-@when('namenode-cluster.joined', 'datanode.journanode.ha', 'leader.elected')
-def hdfs_HA_degraded(cluster, *args):
-    hadoop = get_hadoop_base()
-    hdfs_port = hadoop.dist_config.port('namenode')
-    if cluster.check_peer_hdfs(hdfs_port):
-        set_state('hdfs.degraded')
-    else:
-        remove_state('hdfs.degraded')
-                
 @when('namenode-cluster.joined', 'datanode.journalnode.ha', 'leader.elected')
 @when_not('hdfs.degraded')
 def configure_ha(cluster, datanode, *args):
