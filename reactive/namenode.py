@@ -76,8 +76,20 @@ def send_info(datanode):
     set_state('namenode.ready')
 
 
-@when('namenode-cluster.joined', 'datanode.journalnode.ha')
-def configure_ha(cluster, datanode):
+@when('namenode-cluster.joined')
+@when_not('leader.elected')
+def wait_for_leader(*args):
+    try:
+        hookenv.leader_get('leader_elected')
+        set_state('leader.elected')
+    except NameError:
+        hookenv.status_set('waiting', 'Waiting for Leader to be elected...')
+        if hookenv.is_leader():
+            hookenv.leader_set(leader_elected='True')
+
+                
+@when('namenode-cluster.joined', 'datanode.journalnode.ha', 'leader.elected')
+def configure_ha(cluster, datanode, *args):
     hadoop = get_hadoop_base()
     hdfs = HDFS(hadoop)
     cluster_nodes = cluster.nodes()
