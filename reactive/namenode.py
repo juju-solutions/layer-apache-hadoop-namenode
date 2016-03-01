@@ -1,6 +1,8 @@
+import time
 from charms.reactive import when
 from charms.reactive import when_not
-from charms.reactive import set_state, get_state
+from charms.reactive import set_state
+from charms.reactive.bus import get_state
 from charms.reactive import remove_state
 from charms.reactive import is_state
 from charms.reactive.helpers import data_changed
@@ -79,7 +81,7 @@ def send_info(datanode):
         if hookenv.peer_relation_id() and get_state('hdfs.ha.initialized'):
             peer_unit = hookenv.related_units()
             if not utils.check_peer_port(peer_unit[0], hdfs_port):
-                hookenv.status_set('waiting', 'HDFS HA in Degraded State - waiting for peer...')
+                hookenv.status_set('waiting', 'HDFS HA degraded - waiting for peer...')
                 set_state('hdfs.degraded')
                 return
             else:
@@ -113,6 +115,7 @@ def configure_ha(cluster, datanode, *args):
     set_state('hdfs.ha.initialized')
     hadoop = get_hadoop_base()
     hdfs = HDFS(hadoop)
+    hdfs_port = hadoop.dist_config.port('namenode')
     cluster_nodes = cluster.nodes()
     jn_nodes = datanode.nodes()
     jn_port = datanode.jn_port()
@@ -130,8 +133,18 @@ def configure_ha(cluster, datanode, *args):
         hdfs.stop_namenode()
         if hookenv.is_leader():
             if len(jn_nodes) > 2 and not is_state('namenode.shared-edits.init'):
-                hdfs.init_sharededits()
-                set_state('namenode.shared-edits.init')
+                start = time.time()
+                peer_unit = hookenv.related_units()
+                while time.time() - start < 30:
+                    if not utils.check_peer_port(peer_unit[0], hdfs_port):
+                        hookenv.status_set('waiting', 'HDFS HA degraded - waiting for standby node...')
+                        set_state('hdfs.degraded')
+                        time.sleep(2)
+                    else:
+                        hdfs.init_sharededits()
+                        set_state('namenode.shared-edits.init')
+                        remove_state('hdfs.degraded')
+                raise TimeoutError('Timed out waiting for HDFS HA Standby Node')
                 # 'leader' appears to transition back to standby after restart - test more
         elif not hookenv.is_leader():
             if len(jn_nodes) > 2:
@@ -139,14 +152,28 @@ def configure_ha(cluster, datanode, *args):
                     hdfs.format_namenode()
                     # if this bootstrap happens before the master starts there will be an error
                     # FIX
-                    hdfs.bootstrap_standby()
-                    set_state('namenode.standby.bootstrapped')
+                peer_unit = hookenv.related_units()
+                start = time.time()
+                while time.time() - start < 30:
+                    if not utils.check_peer_port(peer_unit[0], hdfs_port):
+                        hookenv.status_set('waiting', 'HDFS HA degraded - waiting for active node...')
+                        set_state('hdfs.degraded')
+                        time.sleep(2)
+                    else:
+                        remove_state('hdfs.degraded')
+                        hdfs.bootstrap_standby()
+                        set_state('namenode.standby.bootstrapped')
+                        return True
+                raise TimeoutError('Timed out waiting for HDFS HA Active Node')
             else:
                 hookenv.status_set('waiting', 'Waiting for 3 slaves to initialize HDFS HA')
         hdfs.start_namenode()
         if hookenv.is_leader():
             hdfs.ensure_HA_active(cluster_nodes, local_hostname)
 
+
+class TimeoutError(Exception):
+    pass
 
 #if hookenv.is_leader():
 #    @when('namenode-cluster.joined', 'datanode.journalnode.ha')
