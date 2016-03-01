@@ -1,6 +1,6 @@
 from charms.reactive import when
 from charms.reactive import when_not
-from charms.reactive import set_state
+from charms.reactive import set_state, get_state
 from charms.reactive import remove_state
 from charms.reactive import is_state
 from charms.reactive.helpers import data_changed
@@ -25,7 +25,7 @@ def configure_namenode():
         try:
             hookenv.leader_get('hdfs_initalized')
         except NameError:
-            hookenv.leader_set(hdfs_initialized='False') 
+            hookenv.leader_set(hdfs_initialized='False')
         if hookenv.leader_get('hdfs_initialized') == 'False':
             hdfs.create_hdfs_dirs()
             hookenv.leader_set(hdfs_initialized='True')
@@ -40,18 +40,18 @@ def blocked():
     hookenv.status_set('blocked', 'Waiting for relation to DataNodes')
 
 
-@when('namenode-cluster.joined')
-def hdfs_HA_degraded(cluster, *args):
-    hadoop = get_hadoop_base()
-    hdfs_port = hadoop.dist_config.port('namenode')
-    if cluster.check_peer_hdfs(hdfs_port):
-        set_state('hdfs.degraded')
-    else:
-        remove_state('hdfs.degraded')
+# if you run this degraded thing too early, then /etc/hosts doesn't contain the other namenode..!
+#@when('namenode-cluster.joined')
+#def hdfs_HA_degraded(cluster, *args):
+#    hadoop = get_hadoop_base()
+#    hdfs_port = hadoop.dist_config.port('namenode')
+#    if not cluster.check_peer_port(hdfs_port):
+#        set_state('hdfs.degraded')
+#    else:
+#        remove_state('hdfs.degraded')
 
 
 @when('namenode.started', 'datanode.related')
-@when_not('hdfs.degraded')
 def send_info(datanode):
     hadoop = get_hadoop_base()
     hdfs = HDFS(hadoop)
@@ -76,9 +76,18 @@ def send_info(datanode):
 
     slaves = datanode.nodes()
     if data_changed('namenode.slaves', slaves):
-        unitdata.kv().set('namenode.slaves', slaves)
-        hdfs.register_slaves(slaves)
-        hdfs.reload_slaves()
+        if hookenv.peer_relation_id() and get_state('hdfs.ha.initialized'):
+            peer_unit = hookenv.related_units()
+            if not utils.check_peer_port(peer_unit[0], hdfs_port):
+                hookenv.status_set('waiting', 'HDFS HA in Degraded State - waiting for peer...')
+                set_state('hdfs.degraded')
+                return
+            else:
+                remove_state('hdfs.degraded')
+        if not get_state('hdfs.degraded'):
+            unitdata.kv().set('namenode.slaves', slaves)
+            hdfs.register_slaves(slaves)
+            hdfs.reload_slaves()
 
     hookenv.status_set('active', 'Ready ({count} DataNode{s})'.format(
         count=len(slaves),
@@ -100,8 +109,8 @@ def wait_for_leader(*args):
 
 
 @when('namenode-cluster.joined', 'datanode.journalnode.ha', 'leader.elected')
-@when_not('hdfs.degraded')
 def configure_ha(cluster, datanode, *args):
+    set_state('hdfs.ha.initialized')
     hadoop = get_hadoop_base()
     hdfs = HDFS(hadoop)
     cluster_nodes = cluster.nodes()
@@ -179,7 +188,6 @@ def reject_clients(clients):
 
 
 @when('namenode.started', 'datanode.departing')
-@when_not('hdfs.degraded')
 def unregister_datanode(datanode):
     hadoop = get_hadoop_base()
     hdfs = HDFS(hadoop)
