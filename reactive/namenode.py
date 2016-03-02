@@ -158,7 +158,6 @@ def configure_ha(cluster, datanode, *args):
     if data_changed('namenode.ha', [cluster_nodes, jn_nodes, jn_port]):
         utils.update_kv_hosts(cluster.hosts_map())
         utils.manage_etc_hosts()
-        if len(jn_nodes) > 2:
         if hookenv.is_leader():
             if len(jn_nodes) > 2 and not is_state('namenode.shared-edits.init'):
                 #start = time.time()
