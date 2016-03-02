@@ -172,6 +172,7 @@ def configure_ha(cluster, datanode, *args):
                 set_state('namenode.shared-edits.init')
                 cluster.jns_ready()
                 remove_state('hdfs.degraded')
+                local_hostname = hookenv.local_unit().replace('/', '-')
                 hdfs.ensure_HA_active(cluster_nodes, local_hostname)
                 # 'leader' appears to transition back to standby after restart - test more
         elif not hookenv.is_leader():
