@@ -62,7 +62,7 @@ def send_info_ha(datanode, cluster):
     hdfs = HDFS(hadoop)
     cluster_nodes = cluster.nodes()
     hdfs_port = hadoop.dist_config.port('namenode')
-    webhdfs_port = hadoop.dist_config.port('n_webapp_http')
+    webhdfs_port = hadoop.dist_config.port('nn_webapp_http')
 
     utils.update_kv_hosts(datanode.hosts_map())
     utils.manage_etc_hosts()
