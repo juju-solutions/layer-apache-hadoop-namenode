@@ -53,7 +53,53 @@ def blocked():
 #        remove_state('hdfs.degraded')
 
 
+class TimeoutError(Exception):
+    pass
+
+@when('namenode.started', 'datanode.related', 'hdfs.ha.initialized')
+def send_info_ha(datanode, cluster):
+    hadoop = get_hadoop_base()
+    hdfs = HDFS(hadoop)
+    cluster_nodes = cluster.nodes()
+    hdfs_port = hadoop.dist_config.port('namenode')
+    webhdfs_port = hadoop.dist_config.port('n_webapp_http')
+
+    utils.update_kv_hosts(datanode.hosts_map())
+    utils.manage_etc_hosts()
+
+    datanode.send_spec(hadoop.spec())
+    datanode.send_clustername(hookenv.service_name())
+    datanode.send_namenodes(cluster_nodes)
+    datanode.send_ports(hdfs_port, webhdfs_port)
+    datanode.send_ssh_key(utils.get_ssh_key('hdfs'))
+    datanode.send_hosts_map(utils.get_kv_hosts())
+
+    slaves = datanode.nodes()
+    if data_changed('namenode.slaves', slaves):
+        hookenv.log("Waiting for other namenode...")
+        start = time.time()
+        while time.time() - start < 30:
+            if cluster.check_peer_port(hdfs_port):
+                remove_state('hdfs.degraded')
+                unitdata.kv().set('namenode.slaves', slaves)
+                hdfs.register_slaves(slaves)
+                hdfs.reload_slaves()
+                return True
+            else:
+                hookenv.status_set('waiting', 'HDFS HA degraded - waiting for peer...')
+                set_state('hdfs.degraded')
+            time.sleep(2)
+        raise TimeoutError('Timed out waiting for other namenode')
+        
+    hookenv.status_set('active', 'Ready ({count} DataNode{s})'.format(
+        count=len(slaves),
+        s='s' if len(slaves) > 1 else '',
+    ))
+    set_state('namenode.ready')
+
+
 @when('namenode.started', 'datanode.related')
+@when_not('hdfs.ha.initialized')
 def send_info(datanode):
     hadoop = get_hadoop_base()
     hdfs = HDFS(hadoop)
@@ -66,30 +112,16 @@ def send_info(datanode):
 
     datanode.send_spec(hadoop.spec())
     datanode.send_clustername(hookenv.service_name())
-    try:
-        if not hookenv.leader_get('hdfs_HA_initialized') == 'True':
-            datanode.send_namenodes([local_hostname])
-    except NameError:
-            datanode.send_namenodes([local_hostname])
-            return
+    datanode.send_namenodes([local_hostname])
     datanode.send_ports(hdfs_port, webhdfs_port)
     datanode.send_ssh_key(utils.get_ssh_key('hdfs'))
     datanode.send_hosts_map(utils.get_kv_hosts())
 
     slaves = datanode.nodes()
     if data_changed('namenode.slaves', slaves):
-        if hookenv.peer_relation_id() and get_state('hdfs.ha.initialized'):
-            peer_unit = hookenv.related_units()
-            if not utils.check_peer_port(peer_unit[0], hdfs_port):
-                hookenv.status_set('waiting', 'HDFS HA degraded - waiting for peer...')
-                set_state('hdfs.degraded')
-                return
-            else:
-                remove_state('hdfs.degraded')
-        if not get_state('hdfs.degraded'):
-            unitdata.kv().set('namenode.slaves', slaves)
-            hdfs.register_slaves(slaves)
-            hdfs.reload_slaves()
+        unitdata.kv().set('namenode.slaves', slaves)
+        hdfs.register_slaves(slaves)
+        hdfs.reload_slaves()
 
     hookenv.status_set('active', 'Ready ({count} DataNode{s})'.format(
         count=len(slaves),
@@ -134,9 +166,8 @@ def configure_ha(cluster, datanode, *args):
         if hookenv.is_leader():
             if len(jn_nodes) > 2 and not is_state('namenode.shared-edits.init'):
                 start = time.time()
-                peer_unit = hookenv.related_units()
                 while time.time() - start < 30:
-                    if not utils.check_peer_port(peer_unit[0], hdfs_port):
+                    if not cluster.check_peer_port(hdfs_port)
                         hookenv.status_set('waiting', 'HDFS HA degraded - waiting for standby node...')
                         set_state('hdfs.degraded')
                         time.sleep(2)
@@ -155,7 +186,7 @@ def configure_ha(cluster, datanode, *args):
                 peer_unit = hookenv.related_units()
                 start = time.time()
                 while time.time() - start < 30:
-                    if not utils.check_peer_port(peer_unit[0], hdfs_port):
+                    if not cluster.check_peer_port(hdfs_port)
                         hookenv.status_set('waiting', 'HDFS HA degraded - waiting for active node...')
                         set_state('hdfs.degraded')
                         time.sleep(2)
@@ -171,9 +202,6 @@ def configure_ha(cluster, datanode, *args):
         if hookenv.is_leader():
             hdfs.ensure_HA_active(cluster_nodes, local_hostname)
 
-
-class TimeoutError(Exception):
-    pass
 
 #if hookenv.is_leader():
 #    @when('namenode-cluster.joined', 'datanode.journalnode.ha')
