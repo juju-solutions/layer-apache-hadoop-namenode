@@ -56,7 +56,7 @@ def blocked():
 class TimeoutError(Exception):
     pass
 
-@when('namenode.started', 'datanode.related', 'hdfs.ha.initialized')
+@when('namenode.started', 'datanode.related', 'namenode-cluster.initialized')
 def send_info_ha(datanode, cluster):
     hadoop = get_hadoop_base()
     hdfs = HDFS(hadoop)
@@ -99,7 +99,7 @@ def send_info_ha(datanode, cluster):
 
 
 @when('namenode.started', 'datanode.related')
-@when_not('hdfs.ha.initialized')
+@when_not('namenode-cluster.initialized')
 def send_info(datanode):
     hadoop = get_hadoop_base()
     hdfs = HDFS(hadoop)
@@ -158,24 +158,24 @@ def configure_ha(cluster, datanode, *args):
     if data_changed('namenode.ha', [cluster_nodes, jn_nodes, jn_port]):
         utils.update_kv_hosts(cluster.hosts_map())
         utils.manage_etc_hosts()
-        hdfs.configure_namenode(cluster_nodes)
         if len(jn_nodes) > 2:
-            hdfs.register_journalnodes(jn_nodes, jn_port)
-        datanode.send_namenodes(cluster_nodes)
-        hdfs.stop_namenode()
         if hookenv.is_leader():
             if len(jn_nodes) > 2 and not is_state('namenode.shared-edits.init'):
-                start = time.time()
-                while time.time() - start < 30:
-                    if not cluster.check_peer_port(hdfs_port)
-                        hookenv.status_set('waiting', 'HDFS HA degraded - waiting for standby node...')
-                        set_state('hdfs.degraded')
-                        time.sleep(2)
-                    else:
-                        hdfs.init_sharededits()
-                        set_state('namenode.shared-edits.init')
-                        remove_state('hdfs.degraded')
-                raise TimeoutError('Timed out waiting for HDFS HA Standby Node')
+                #start = time.time()
+                #while time.time() - start < 30:
+                #    if not cluster.check_peer_port(hdfs_port):
+                #        hookenv.status_set('waiting', 'HDFS HA degraded - waiting for standby node...')
+                #        set_state('hdfs.degraded')
+                #        time.sleep(2)
+                #    else:
+                #        return True
+                #raise TimeoutError('Timed out waiting for HDFS HA Standby Node')
+                hdfs.stop_namenode()
+                hdfs.register_journalnodes(jn_nodes, jn_port)
+                hdfs.init_sharededits()
+                hdfs.configure_namenode(cluster_nodes)
+                set_state('namenode.shared-edits.init')
+                remove_state('hdfs.degraded')
                 # 'leader' appears to transition back to standby after restart - test more
         elif not hookenv.is_leader():
             if len(jn_nodes) > 2:
@@ -183,15 +183,17 @@ def configure_ha(cluster, datanode, *args):
                     hdfs.format_namenode()
                     # if this bootstrap happens before the master starts there will be an error
                     # FIX
-                peer_unit = hookenv.related_units()
                 start = time.time()
                 while time.time() - start < 30:
-                    if not cluster.check_peer_port(hdfs_port)
+                    if not cluster.check_peer_port(hdfs_port):
                         hookenv.status_set('waiting', 'HDFS HA degraded - waiting for active node...')
                         set_state('hdfs.degraded')
                         time.sleep(2)
                     else:
                         remove_state('hdfs.degraded')
+                        hdfs.stop_namenode()
+                        hdfs.register_journalnodes(jn_nodes, jn_port)
+                        hdfs.configure_namenode(cluster_nodes)
                         hdfs.bootstrap_standby()
                         set_state('namenode.standby.bootstrapped')
                         return True
@@ -199,6 +201,7 @@ def configure_ha(cluster, datanode, *args):
             else:
                 hookenv.status_set('waiting', 'Waiting for 3 slaves to initialize HDFS HA')
         hdfs.start_namenode()
+        datanode.send_namenodes(cluster_nodes)
         if hookenv.is_leader():
             hdfs.ensure_HA_active(cluster_nodes, local_hostname)
 
