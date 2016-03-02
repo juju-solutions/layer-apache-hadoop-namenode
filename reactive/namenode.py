@@ -151,10 +151,6 @@ def configure_ha(cluster, datanode, *args):
     cluster_nodes = cluster.nodes()
     jn_nodes = datanode.nodes()
     jn_port = datanode.jn_port()
-    local_hostname = hookenv.local_unit().replace('/', '-')
-    if hookenv.is_leader():
-        hookenv.leader_set(hdfs_HA_initialized='True')
-    #set_state('hdfs.HA.initialized', True)
     if data_changed('namenode.ha', [cluster_nodes, jn_nodes, jn_port]):
         utils.update_kv_hosts(cluster.hosts_map())
         utils.manage_etc_hosts()
@@ -174,11 +170,14 @@ def configure_ha(cluster, datanode, *args):
                 hdfs.init_sharededits()
                 hdfs.configure_namenode(cluster_nodes)
                 set_state('namenode.shared-edits.init')
+                cluster.jns_ready()
                 remove_state('hdfs.degraded')
+                hdfs.ensure_HA_active(cluster_nodes, local_hostname)
                 # 'leader' appears to transition back to standby after restart - test more
         elif not hookenv.is_leader():
             if len(jn_nodes) > 2:
-                if not is_state('namenode.standby.bootstrapped'):
+                if not is_state('namenode.standby.bootstrapped') and cluster.are_jns_ready():
+                    hdfs.stop_namenode()
                     hdfs.format_namenode()
                     # if this bootstrap happens before the master starts there will be an error
                     # FIX
@@ -201,8 +200,6 @@ def configure_ha(cluster, datanode, *args):
                 hookenv.status_set('waiting', 'Waiting for 3 slaves to initialize HDFS HA')
         hdfs.start_namenode()
         datanode.send_namenodes(cluster_nodes)
-        if hookenv.is_leader():
-            hdfs.ensure_HA_active(cluster_nodes, local_hostname)
 
 
 #if hookenv.is_leader():
