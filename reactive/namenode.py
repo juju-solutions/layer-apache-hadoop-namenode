@@ -144,7 +144,6 @@ def send_info(datanode):
 
 @when('namenode-cluster.joined', 'datanode.journalnode.ha')  # , 'leader.elected')
 def configure_ha(cluster, datanode, *args):
-    set_state('hdfs.ha.initialized')
     cluster_nodes = cluster.nodes()
     jn_nodes = datanode.nodes()
     jn_port = datanode.jn_port()
@@ -157,7 +156,8 @@ def configure_ha(cluster, datanode, *args):
             utils.manage_etc_hosts()
             datanode.send_namenodes(cluster_nodes)
             hdfs.configure_namenode(cluster_nodes)
-            hdfs.restart_namenode()
+            if not get_state('hdfs.ha.initialized'):
+                hdfs.restart_namenode()
         if data_changed('journalnode.ha', [jn_nodes, jn_port]):
             utils.manage_etc_hosts()
             hdfs.register_journalnodes(jn_nodes, jn_port)
@@ -183,6 +183,7 @@ def configure_ha(cluster, datanode, *args):
                 hdfs.start_namenode()
             else:
                 hookenv.status_set('waiting', 'Waiting for 3 slaves to initialize HDFS HA')
+    set_state('hdfs.ha.initialized')
 
 
 #if hookenv.is_leader():
