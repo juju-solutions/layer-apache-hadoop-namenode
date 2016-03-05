@@ -23,15 +23,7 @@ def configure_namenode():
     hdfs.configure_namenode([local_hostname])
     hdfs.format_namenode()
     hdfs.start_namenode()
-    if hookenv.is_leader():
-        try:
-            hookenv.leader_get('hdfs_initalized')
-        except NameError:
-            hookenv.leader_set(hdfs_initialized='False')
-        if hookenv.leader_get('hdfs_initialized') == 'False':
-            hookenv.log("creating_hdfs_dirs in reactive here...")
-            hdfs.create_hdfs_dirs()
-            hookenv.leader_set(hdfs_initialized='True')
+    hdfs.create_hdfs_dirs()
     hadoop.open_ports('namenode')
     utils.update_kv_hosts({ip_addr: local_hostname})
     set_state('namenode.started')
