@@ -152,12 +152,15 @@ def configure_ha(cluster, datanode, *args):
     hdfs = HDFS(hadoop)
     cluster_nodes = cluster.nodes()
     if datanode.journalnodes_ready():
-        if data_changed('namenode.ha', [cluster_nodes, jn_nodes, jn_port]):
+        if data_changed('namenode.ha', cluster_nodes):
             utils.update_kv_hosts(cluster.hosts_map())
             utils.manage_etc_hosts()
-        datanode.send_namenodes(cluster_nodes)
-        hdfs.configure_namenode(cluster_nodes)
-        hdfs.register_journalnodes(jn_nodes, jn_port)
+            datanode.send_namenodes(cluster_nodes)
+            hdfs.configure_namenode(cluster_nodes)
+            hdfs.restart_namenode()
+        if data_changed('namenode.ha', [jn_nodes, jn_port]):
+            utils.manage_etc_hosts()
+            hdfs.register_journalnodes(jn_nodes, jn_port)
         if hookenv.is_leader():
             if not is_state('namenode.shared-edits.init'):
                 hdfs.stop_namenode()
@@ -174,8 +177,7 @@ def configure_ha(cluster, datanode, *args):
                 hdfs.stop_namenode()
                 hdfs.format_namenode()
                 remove_state('hdfs.degraded')
-                hdfs.stop_namenode()
-                hdfs.configure_namenode(cluster_nodes)
+                #hdfs.configure_namenode(cluster_nodes)
                 hdfs.bootstrap_standby()
                 set_state('namenode.standby.bootstrapped')
                 hdfs.start_namenode()
