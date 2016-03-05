@@ -71,7 +71,7 @@ def send_info_ha(datanode, cluster):
     if data_changed('namenode.slaves', slaves):
         hookenv.log("Waiting for other namenode...")
         start = time.time()
-        while time.time() - start < 30:
+        while time.time() - start < 120:
             if cluster.check_peer_port(hdfs_port):
                 remove_state('hdfs.degraded')
                 unitdata.kv().set('namenode.slaves', slaves)
