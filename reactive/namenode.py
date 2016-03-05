@@ -155,9 +155,9 @@ def configure_ha(cluster, datanode, *args):
         if data_changed('namenode.ha', [cluster_nodes, jn_nodes, jn_port]):
             utils.update_kv_hosts(cluster.hosts_map())
             utils.manage_etc_hosts()
-            datanode.send_namenodes(cluster_nodes)
-            hdfs.configure_namenode(cluster_nodes)
-            hdfs.register_journalnodes(jn_nodes, jn_port)
+        datanode.send_namenodes(cluster_nodes)
+        hdfs.configure_namenode(cluster_nodes)
+        hdfs.register_journalnodes(jn_nodes, jn_port)
         if hookenv.is_leader():
             if not is_state('namenode.shared-edits.init'):
                 hdfs.stop_namenode()
