@@ -84,7 +84,7 @@ def send_info_ha(datanode, cluster):
             time.sleep(2)
         raise TimeoutError('Timed out waiting for other namenode')
         
-    hookenv.status_set('active', 'Ready ({count} DataNode{s})'.format(
+    hookenv.status_set('active', 'Ready ({count} DataNode{s}) (HA)'.format(
         count=len(slaves),
         s='s' if len(slaves) > 1 else '',
     ))
@@ -155,6 +155,7 @@ def configure_ha(cluster, datanode, *args):
             utils.update_kv_hosts(cluster.hosts_map())
             utils.manage_etc_hosts()
             hdfs.register_journalnodes(jn_nodes, jn_port)
+            datanode.queue_restart()
         if hookenv.is_leader():
             if not is_state('namenode.shared-edits.init'):
                 utils.update_kv_hosts(cluster.hosts_map())
