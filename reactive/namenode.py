@@ -182,8 +182,8 @@ def configure_ha(cluster, datanode, *args):
                 hdfs.bootstrap_standby()
                 set_state('namenode.standby.bootstrapped')
                 hdfs.start_namenode()
-            else:
-                hookenv.status_set('waiting', 'Waiting for 3 slaves to initialize HDFS HA')
+    else:
+        hookenv.status_set('waiting', 'Waiting for 3 slaves to initialize HDFS HA')
     set_state('hdfs.ha.initialized')
 
 
