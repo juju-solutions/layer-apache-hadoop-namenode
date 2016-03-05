@@ -152,10 +152,13 @@ def configure_ha(cluster, datanode, *args):
             if not get_state('hdfs.ha.initialized'):
                 hdfs.restart_namenode()
         if data_changed('journalnode.ha', [jn_nodes, jn_port]):
+            utils.update_kv_hosts(cluster.hosts_map())
             utils.manage_etc_hosts()
             hdfs.register_journalnodes(jn_nodes, jn_port)
         if hookenv.is_leader():
             if not is_state('namenode.shared-edits.init'):
+                utils.update_kv_hosts(cluster.hosts_map())
+                utils.manage_etc_hosts()
                 hdfs.stop_namenode()
                 hdfs.init_sharededits()
                 set_state('namenode.shared-edits.init')
@@ -167,6 +170,8 @@ def configure_ha(cluster, datanode, *args):
                 # 'leader' appears to transition back to standby after restart - test more
         elif not hookenv.is_leader():
             if not is_state('namenode.standby.bootstrapped') and cluster.are_jns_init():
+                utils.update_kv_hosts(cluster.hosts_map())
+                utils.manage_etc_hosts()
                 hdfs.stop_namenode()
                 hdfs.format_namenode()
                 remove_state('hdfs.degraded')
