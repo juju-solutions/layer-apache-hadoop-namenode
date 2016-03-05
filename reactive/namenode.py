@@ -130,19 +130,19 @@ def send_info(datanode):
     set_state('namenode.ready')
 
 
-@when('namenode-cluster.joined')
-@when_not('leader.elected')
-def wait_for_leader(*args):
-    try:
-        hookenv.leader_get('leader_elected')
-        set_state('leader.elected')
-    except NameError:
-        hookenv.status_set('waiting', 'Waiting for Leader to be elected...')
-        if hookenv.is_leader():
-            hookenv.leader_set(leader_elected='True')
+#@when('namenode-cluster.joined')
+#@when_not('leader.elected')
+#def wait_for_leader(*args):
+#    try:
+#        hookenv.leader_get('leader_elected')
+#        set_state('leader.elected')
+#    except NameError:
+#        hookenv.status_set('waiting', 'Waiting for Leader to be elected...')
+#        if hookenv.is_leader():
+#            hookenv.leader_set(leader_elected='True')
 
 
-@when('namenode-cluster.joined', 'datanode.journalnode.ha', 'leader.elected')
+@when('namenode-cluster.joined', 'datanode.journalnode.ha')  # , 'leader.elected')
 def configure_ha(cluster, datanode, *args):
     set_state('hdfs.ha.initialized')
     cluster_nodes = cluster.nodes()
@@ -174,7 +174,7 @@ def configure_ha(cluster, datanode, *args):
                 hdfs.ensure_HA_active(cluster_nodes, local_hostname)
                 # 'leader' appears to transition back to standby after restart - test more
         elif not hookenv.is_leader():
-            if not is_state('namenode.standby.bootstrapped'):
+            if not is_state('namenode.standby.bootstrapped') and not datanode.are_jns_ready():
                 hdfs.stop_namenode()
                 hdfs.format_namenode()
                 # if this bootstrap happens before the master starts there will be an error
