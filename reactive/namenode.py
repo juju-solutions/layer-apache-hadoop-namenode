@@ -158,7 +158,7 @@ def configure_ha(cluster, datanode, *args):
             datanode.send_namenodes(cluster_nodes)
             hdfs.configure_namenode(cluster_nodes)
             hdfs.restart_namenode()
-        if data_changed('namenode.ha', [jn_nodes, jn_port]):
+        if data_changed('journalnode.ha', [jn_nodes, jn_port]):
             utils.manage_etc_hosts()
             hdfs.register_journalnodes(jn_nodes, jn_port)
         if hookenv.is_leader():
