@@ -29,6 +29,7 @@ def configure_namenode():
         except NameError:
             hookenv.leader_set(hdfs_initialized='False')
         if hookenv.leader_get('hdfs_initialized') == 'False':
+            hookenv.log("creating_hdfs_dirs in reactive here...")
             hdfs.create_hdfs_dirs()
             hookenv.leader_set(hdfs_initialized='True')
     hadoop.open_ports('namenode')
