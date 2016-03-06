@@ -155,7 +155,9 @@ def configure_ha(cluster, datanode, *args):
             utils.update_kv_hosts(cluster.hosts_map())
             utils.manage_etc_hosts()
             hdfs.register_journalnodes(jn_nodes, jn_port)
-            datanode.queue_restart()
+            # this is going to fire from each namenode: fix
+            if hookenv.is_leader():
+                set_state('dn.queue.restart')
         if hookenv.is_leader():
             if not is_state('namenode.shared-edits.init'):
                 utils.update_kv_hosts(cluster.hosts_map())
@@ -164,9 +166,9 @@ def configure_ha(cluster, datanode, *args):
                 hdfs.init_sharededits()
                 set_state('namenode.shared-edits.init')
                 cluster.jns_init()
-                remove_state('hdfs.degraded')
                 local_hostname = hookenv.local_unit().replace('/', '-')
                 hdfs.start_namenode()
+                remove_state('hdfs.degraded')
                 hdfs.ensure_HA_active(cluster_nodes, local_hostname)
                 # 'leader' appears to transition back to standby after restart - test more
         elif not hookenv.is_leader():
@@ -175,15 +177,21 @@ def configure_ha(cluster, datanode, *args):
                 utils.manage_etc_hosts()
                 hdfs.stop_namenode()
                 hdfs.format_namenode()
-                remove_state('hdfs.degraded')
                 #hdfs.configure_namenode(cluster_nodes)
                 hdfs.bootstrap_standby()
                 set_state('namenode.standby.bootstrapped')
                 hdfs.start_namenode()
+                remove_state('hdfs.degraded')
     else:
         hookenv.status_set('waiting', 'Waiting for 3 slaves to initialize HDFS HA')
     set_state('hdfs.ha.initialized')
 
+
+@when('datanode.journalnode.ha', 'dn.queue.restart')
+@when_not('hdfs.degraded')
+def dn_queue_restart(datanode, *args):
+    datanode.queue_restart()
+    remove_state('dn.queue.restart')
 
 #if hookenv.is_leader():
 #    @when('namenode-cluster.joined', 'datanode.journalnode.ha')
