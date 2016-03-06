@@ -177,15 +177,15 @@ def configure_ha(cluster, datanode, *args):
                 hdfs.format_namenode()
                 #hdfs.configure_namenode(cluster_nodes)
                 hdfs.bootstrap_standby()
-                set_state('namenode.standby.bootstrapped')
                 hdfs.start_namenode()
+                set_state('namenode.standby.bootstrapped')
                 remove_state('hdfs.degraded')
     else:
         hookenv.status_set('waiting', 'Waiting for 3 slaves to initialize HDFS HA')
     set_state('hdfs.ha.initialized')
 
 
-@when('datanode.journalnode.ha', 'dn.queue.restart', 'namenode.shared-edits.init')
+@when('datanode.journalnode.ha', 'dn.queue.restart', 'namenode.standby.bootstrapped')
 @when_not('hdfs.degraded')
 def dn_queue_restart(datanode, *args):
     datanode.queue_restart()
