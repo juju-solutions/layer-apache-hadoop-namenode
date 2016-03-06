@@ -155,9 +155,7 @@ def configure_ha(cluster, datanode, *args):
             utils.update_kv_hosts(cluster.hosts_map())
             utils.manage_etc_hosts()
             hdfs.register_journalnodes(jn_nodes, jn_port)
-            # this is going to fire from each namenode: fix
-            if hookenv.is_leader():
-                set_state('dn.queue.restart')
+            set_state('dn.queue.restart')
         if hookenv.is_leader():
             if not is_state('namenode.shared-edits.init'):
                 utils.update_kv_hosts(cluster.hosts_map())
@@ -187,7 +185,7 @@ def configure_ha(cluster, datanode, *args):
     set_state('hdfs.ha.initialized')
 
 
-@when('datanode.journalnode.ha', 'dn.queue.restart')
+@when('datanode.journalnode.ha', 'dn.queue.restart', 'namenode.shared-edits.init')
 @when_not('hdfs.degraded')
 def dn_queue_restart(datanode, *args):
     datanode.queue_restart()
