@@ -35,19 +35,9 @@ def blocked():
     hookenv.status_set('blocked', 'Waiting for relation to DataNodes')
 
 
-# if you run this degraded thing too early, then /etc/hosts doesn't contain the other namenode..!
-#@when('namenode-cluster.joined')
-#def hdfs_HA_degraded(cluster, *args):
-#    hadoop = get_hadoop_base()
-#    hdfs_port = hadoop.dist_config.port('namenode')
-#    if not cluster.check_peer_port(hdfs_port):
-#        set_state('hdfs.degraded')
-#    else:
-#        remove_state('hdfs.degraded')
-
-
 class TimeoutError(Exception):
     pass
+
 
 @when('namenode.started', 'datanode.related', 'namenode-cluster.initialized')
 def send_info_ha(datanode, cluster):
@@ -123,19 +113,7 @@ def send_info(datanode):
     set_state('namenode.ready')
 
 
-#@when('namenode-cluster.joined')
-#@when_not('leader.elected')
-#def wait_for_leader(*args):
-#    try:
-#        hookenv.leader_get('leader_elected')
-#        set_state('leader.elected')
-#    except NameError:
-#        hookenv.status_set('waiting', 'Waiting for Leader to be elected...')
-#        if hookenv.is_leader():
-#            hookenv.leader_set(leader_elected='True')
-
-
-@when('namenode-cluster.joined', 'datanode.journalnode.ha')  # , 'leader.elected')
+@when('namenode-cluster.joined', 'datanode.journalnode.ha')
 def configure_ha(cluster, datanode, *args):
     cluster_nodes = cluster.nodes()
     jn_nodes = datanode.nodes()
@@ -167,6 +145,7 @@ def configure_ha(cluster, datanode, *args):
                 local_hostname = hookenv.local_unit().replace('/', '-')
                 hdfs.start_namenode()
                 remove_state('hdfs.degraded')
+                # following is required at least if no namenode was already configured
                 hdfs.ensure_HA_active(cluster_nodes, local_hostname)
                 # 'leader' appears to transition back to standby after restart - test more
         elif not hookenv.is_leader():
@@ -175,7 +154,6 @@ def configure_ha(cluster, datanode, *args):
                 utils.manage_etc_hosts()
                 hdfs.stop_namenode()
                 hdfs.format_namenode()
-                #hdfs.configure_namenode(cluster_nodes)
                 hdfs.bootstrap_standby()
                 hdfs.start_namenode()
                 set_state('namenode.standby.bootstrapped')
@@ -190,22 +168,6 @@ def configure_ha(cluster, datanode, *args):
 def dn_queue_restart(datanode, *args):
     datanode.queue_restart()
     remove_state('dn.queue.restart')
-
-#if hookenv.is_leader():
-#    @when('namenode-cluster.joined', 'datanode.journalnode.ha')
-#    @when_not('zookeeper.joined')
-#    def ensure_active(cluster, datanode):
-#        '''
-#        If we enable HA before zookeeper is connected, we need to at least
-#        ensure that one namenode is active and one is standby to ensure that
-#        hdfs is functional
-#        '''
-#        hadoop = get_hadoop_base()
-#        hdfs = HDFS(hadoop)
-#        local_hostname = hookenv.local_unit().replace('/', '-')
-#        hookenv.log('Zookeeper not related, failovers will not be automatic')
-#        cluster_nodes = cluster.nodes()
-#        hdfs.ensure_HA_active(cluster_nodes, local_hostname)
 
 
 @when('namenode.clients')
