@@ -40,7 +40,8 @@ def send_info(datanode):
     hdfs_port = hadoop.dist_config.port('namenode')
     webhdfs_port = hadoop.dist_config.port('nn_webapp_http')
 
-    utils.update_kv_hosts({node['ip']: node['host'] for node in datanode.nodes()})
+    utils.update_kv_hosts({node['ip']: node['host']
+                           for node in datanode.nodes()})
     utils.manage_etc_hosts()
 
     datanode.send_spec(hadoop.spec())
@@ -105,7 +106,7 @@ def unregister_datanode(datanode):
 
     datanode.dismiss()
 
+
 @when('benchmark.related')
 def register_benchmarks(benchmark):
     benchmark.register('nnbench', 'testdfsio')
-
