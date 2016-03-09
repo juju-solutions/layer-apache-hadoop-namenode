@@ -27,12 +27,12 @@ def configure_namenode():
 
 
 @when('namenode.started')
-@when_not('datanode.related')
+@when_not('datanode.joined')
 def blocked():
     hookenv.status_set('blocked', 'Waiting for relation to DataNodes')
 
 
-@when('namenode.started', 'datanode.related')
+@when('namenode.started', 'datanode.joined')
 def send_info(datanode):
     hadoop = get_hadoop_base()
     hdfs = HDFS(hadoop)
