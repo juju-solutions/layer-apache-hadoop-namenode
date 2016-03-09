@@ -121,7 +121,9 @@ def configure_ha(cluster, datanode, *args):
     hadoop = get_hadoop_base()
     hdfs = HDFS(hadoop)
     local_hostname = hookenv.local_unit().replace('/', '-')
-    ha_node_state = utils.ha_node_state(local_hostname).lower()
+    ha_node_state = utils.ha_node_state(local_hostname)
+    if not 'ctive' in ha_node_state or not 'andby' in ha_node_state:
+        ha_node_state = 'undefined'
     if datanode.journalnodes_quorum():
         if data_changed('namenode.ha', cluster_nodes):
             utils.update_kv_hosts(cluster.hosts_map())
