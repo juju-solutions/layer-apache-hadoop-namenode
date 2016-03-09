@@ -120,7 +120,6 @@ def configure_ha(cluster, datanode, *args):
     jn_port = datanode.jn_port()
     hadoop = get_hadoop_base()
     hdfs = HDFS(hadoop)
-    cluster_nodes = cluster.nodes()
     local_hostname = hookenv.local_unit().replace('/', '-')
     ha_node_state = utils.ha_node_state(local_hostname).lower()
     if datanode.journalnodes_quorum():
