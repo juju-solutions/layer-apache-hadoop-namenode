@@ -113,7 +113,7 @@ def send_info(datanode):
     set_state('namenode.ready')
 
 
-@when('namenode-cluster.joined', 'datanode.journalnode.ha')
+@when('namenode-cluster.joined', 'datanode.journalnode.joined')
 def configure_ha(cluster, datanode, *args):
     cluster_nodes = cluster.nodes()
     jn_nodes = datanode.nodes()
@@ -121,7 +121,9 @@ def configure_ha(cluster, datanode, *args):
     hadoop = get_hadoop_base()
     hdfs = HDFS(hadoop)
     cluster_nodes = cluster.nodes()
-    if datanode.journalnodes_ready():
+    local_hostname = hookenv.local_unit().replace('/', '-')
+    ha_node_state = utils.ha_node_state(local_hostname).lower()
+    if datanode.journalnodes_quorum():
         if data_changed('namenode.ha', cluster_nodes):
             utils.update_kv_hosts(cluster.hosts_map())
             utils.manage_etc_hosts()
@@ -129,12 +131,13 @@ def configure_ha(cluster, datanode, *args):
             hdfs.configure_namenode(cluster_nodes)
             if not get_state('hdfs.ha.initialized'):
                 hdfs.restart_namenode()
-        if data_changed('journalnode.ha', [jn_nodes, jn_port]):
+        if data_changed('journalnodes', [jn_nodes, jn_port]):
             utils.update_kv_hosts(cluster.hosts_map())
             utils.manage_etc_hosts()
             hdfs.register_journalnodes(jn_nodes, jn_port)
             set_state('dn.queue.restart')
-        if hookenv.is_leader():
+        if ha_node_state == 'active':
+        # if hookenv.is_leader():
             if not is_state('namenode.shared-edits.init'): # and if not namenode.standby.bootstrapped?
                 utils.update_kv_hosts(cluster.hosts_map())
                 utils.manage_etc_hosts()
@@ -142,13 +145,12 @@ def configure_ha(cluster, datanode, *args):
                 hdfs.init_sharededits()
                 set_state('namenode.shared-edits.init')
                 cluster.jns_init()
-                local_hostname = hookenv.local_unit().replace('/', '-')
                 hdfs.start_namenode()
                 remove_state('hdfs.degraded')
                 # following is required at least if no namenode was already configured
                 hdfs.ensure_HA_active(cluster_nodes, local_hostname)
                 # 'leader' appears to transition back to standby after restart - test more
-        elif not hookenv.is_leader():
+        elif ha_node_state == 'standby':
             if not is_state('namenode.standby.bootstrapped') and cluster.are_jns_init():
                 utils.update_kv_hosts(cluster.hosts_map())
                 utils.manage_etc_hosts()
