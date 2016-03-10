@@ -28,12 +28,23 @@ included in the bigdata bundles linked above:
 
 ## Benchmarking
 
-You can perform a namenode benchmark (nnbench), in order to test your namenode system and configuration
+This charm provides several benchmarks to gauge the performance of your
+environment.
+
+The easiest way to run the benchmarks on this service is to relate it to the
+[Benchmark GUI][].  You will likely also want to relate it to the
+[Benchmark Collector][] to have machine-level information collected during the
+benchmark, for a more complete picture of how the machine performed.
+
+[Benchmark GUI]: https://jujucharms.com/benchmark-gui/
+[Benchmark Collector]: https://jujucharms.com/benchmark-collector/
+
+However, each benchmark is also an action that can be called manually:
 
         $ juju action do namenode/0 nnbench
         Action queued with id: 55887b40-116c-4020-8b35-1e28a54cc622
         $ juju action fetch --wait 0 55887b40-116c-4020-8b35-1e28a54cc622
-        
+
         results:
           meta:
             composite:
