@@ -107,6 +107,6 @@ def unregister_datanode(datanode):
     datanode.dismiss()
 
 
-@when('benchmark.related')
+@when('benchmark.joined')
 def register_benchmarks(benchmark):
     benchmark.register('nnbench', 'testdfsio')
