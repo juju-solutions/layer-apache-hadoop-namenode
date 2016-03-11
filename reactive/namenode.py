@@ -137,7 +137,6 @@ def configure_ha(cluster, datanode, *args):
             utils.update_kv_hosts(cluster.hosts_map())
             utils.manage_etc_hosts()
             hdfs.register_journalnodes(jn_nodes, jn_port)
-            set_state('dn.queue.restart')
         #if ha_node_state == 'active':
         if hookenv.is_leader():
             if not is_state('namenode.shared-edits.init'): # and if not namenode.standby.bootstrapped?
@@ -161,6 +160,8 @@ def configure_ha(cluster, datanode, *args):
                 hdfs.format_namenode()
                 hdfs.bootstrap_standby()
                 hdfs.start_namenode()
+                # REVIEW - is this the best place to queue a restart of the datanode to apply config?
+                set_state('dn.queue.restart')
                 set_state('namenode.standby.bootstrapped')
                 remove_state('hdfs.degraded')
     else:
@@ -170,7 +171,7 @@ def configure_ha(cluster, datanode, *args):
     set_state('hdfs.ha.initialized')
 
 
-@when('datanode.journalnode.ha', 'dn.queue.restart', 'namenode.standby.bootstrapped')
+@when('datanode.journalnode.joined', 'dn.queue.restart', 'namenode.standby.bootstrapped')
 @when_not('hdfs.degraded')
 def dn_queue_restart(datanode, *args):
     datanode.queue_restart()
