@@ -6,3 +6,4 @@ includes:
   - 'interface:dfs'
   - 'interface:dfs-slave'
   - 'interface:benchmark'
+  - 'interface:zookeeper'

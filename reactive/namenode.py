@@ -113,9 +113,10 @@ def send_info(datanode):
     set_state('namenode.ready')
 
 
-@when('namenode-cluster.joined', 'datanode.journalnode.joined')
-def configure_ha(cluster, datanode, *args):
+@when('namenode-cluster.joined', 'datanode.journalnode.joined', 'zookeeper.ready')
+def configure_ha(cluster, datanode, zookeeper, *args):
     cluster_nodes = cluster.nodes()
+    zookeeper_nodes = zookeeper.zookeepers()
     jn_nodes = datanode.nodes()
     jn_port = datanode.jn_port()
     hadoop = get_hadoop_base()
@@ -130,7 +131,7 @@ def configure_ha(cluster, datanode, *args):
             utils.update_kv_hosts(cluster.hosts_map())
             utils.manage_etc_hosts()
             datanode.send_namenodes(cluster_nodes)
-            hdfs.configure_namenode(cluster_nodes)
+            hdfs.configure_namenode(cluster_nodes, zookeeper_nodes)
             if not get_state('hdfs.ha.initialized'):
                 hdfs.restart_namenode()
         if data_changed('journalnodes', [jn_nodes, jn_port]):
