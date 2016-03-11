@@ -3,7 +3,7 @@ from charms.reactive import when_not
 from charms.reactive import set_state
 from charms.reactive import remove_state
 from charms.reactive.helpers import data_changed
-from charms.hadoop import get_hadoop_base
+from charms.layer.hadoop_base import get_hadoop_base
 from jujubigdata.handlers import HDFS
 from jujubigdata import utils
 from charmhelpers.core import hookenv, unitdata
