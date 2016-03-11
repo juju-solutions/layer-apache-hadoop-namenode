@@ -186,6 +186,7 @@ def accept_clients(clients):
 
     clients.send_spec(hadoop.spec())
     # How to handle send_namenodes here?
+    clients.send_clustername(hookenv.service_name())
     clients.send_namenodes([local_hostname])
     clients.send_ports(hdfs_port, webhdfs_port)
     clients.send_hosts_map(utils.get_kv_hosts())
