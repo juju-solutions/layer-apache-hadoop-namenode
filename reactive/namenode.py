@@ -39,7 +39,7 @@ class TimeoutError(Exception):
     pass
 
 
-@when('namenode.started', 'datanode.related', 'namenode-cluster.initialized')
+@when('namenode.started', 'datanode.joined', 'namenode-cluster.initialized')
 def send_info_ha(datanode, cluster):
     hadoop = get_hadoop_base()
     hdfs = HDFS(hadoop)
@@ -81,7 +81,7 @@ def send_info_ha(datanode, cluster):
     set_state('namenode.ready')
 
 
-@when('namenode.started', 'datanode.related')
+@when('namenode.started', 'datanode.joined')
 @when_not('namenode-cluster.initialized')
 def send_info(datanode):
     hadoop = get_hadoop_base()
