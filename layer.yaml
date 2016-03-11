@@ -1,1 +1,6 @@
-includes: ['layer:hadoop-base', 'interface:dfs', 'interface:dfs-slave', 'interface:benchmark']
+includes:
+  - 'layer:hadoop-base'
+  - 'layer:hadoop-ganglia'
+  - 'interface:dfs'
+  - 'interface:dfs-slave'
+  - 'interface:benchmark'
