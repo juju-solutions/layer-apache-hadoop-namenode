@@ -149,8 +149,10 @@ def configure_ha(cluster, datanode, zookeeper, *args):
                 cluster.jns_init()
                 hdfs.start_namenode()
                 remove_state('hdfs.degraded')
+                hdfs.format_zookeeper()
+                hdfs.restart_dfs()
                 # following is required at least if no namenode was already configured
-                hdfs.ensure_HA_active(cluster_nodes, local_hostname)
+                #hdfs.ensure_HA_active(cluster_nodes, local_hostname)
                 # 'leader' appears to transition back to standby after restart - test more
         # elif ha_node_state == 'standby':
         elif not hookenv.is_leader():
