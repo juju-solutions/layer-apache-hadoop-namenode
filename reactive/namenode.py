@@ -116,7 +116,6 @@ def send_info(datanode):
 @when('namenode-cluster.joined', 'datanode.journalnode.joined', 'zookeeper.ready')
 def configure_ha(cluster, datanode, zookeeper, *args):
     cluster_nodes = cluster.nodes()
-    cluster.send_ssh_key(utils.get_ssh_key('hdfs'))
     zookeeper_nodes = zookeeper.zookeepers()
     jn_nodes = datanode.nodes()
     jn_port = datanode.jn_port()
