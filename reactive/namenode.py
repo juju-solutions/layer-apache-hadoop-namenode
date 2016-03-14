@@ -138,7 +138,6 @@ def configure_ha(cluster, datanode, zookeeper, *args):
             utils.update_kv_hosts(cluster.hosts_map())
             utils.manage_etc_hosts()
             hdfs.register_journalnodes(jn_nodes, jn_port)
-        #if ha_node_state == 'active':
         if hookenv.is_leader():
             cluster.send_ssh_key(utils.get_ssh_key('hdfs'))
             if cluster.ssh_key():
@@ -173,12 +172,11 @@ def configure_ha(cluster, datanode, zookeeper, *args):
                 set_state('dn.queue.restart')
                 set_state('namenode.standby.bootstrapped')
                 remove_state('hdfs.degraded')
-        set_state('hdfs.ha.initialized')
     else:
         # following line untested
         remove_state('namenode.shared-edits.init')
         hookenv.status_set('waiting', 'Waiting for 3 slaves to initialize HDFS HA')
-    set_state('hdfs.cluster.initialized')
+    set_state('hdfs.ha.initialized')
 
 
 @when('datanode.journalnode.joined', 'dn.queue.restart', 'namenode.standby.bootstrapped')
