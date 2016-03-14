@@ -130,7 +130,7 @@ def configure_ha(cluster, datanode, zookeeper, *args):
     if ha_node_state:
         if not 'ctive' in ha_node_state or not 'andby' in ha_node_state:
             ha_node_state = 'undefined'
-    if datanode.journalnodes_quorum() and len(zookeeper_nodes) > 3:
+    if datanode.journalnodes_quorum() and len(zookeeper_nodes) > 2 and not len(zookeeper_nodes) % 2 == 0:
         if data_changed('namenode.ha', cluster_nodes):
             utils.update_kv_hosts(cluster.hosts_map())
             utils.manage_etc_hosts()
