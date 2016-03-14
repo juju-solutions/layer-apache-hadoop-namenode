@@ -123,13 +123,6 @@ def configure_ha(cluster, datanode, zookeeper, *args):
     hdfs = HDFS(hadoop)
     local_hostname = hookenv.local_unit().replace('/', '-')
     ha_node_state = utils.ha_node_state(local_hostname)
-    if data_changed('namenode.pre.ha', cluster_nodes):
-        if hookenv.is_leader():
-            cluster.send_ssh_key_active(utils.get_ssh_key('hdfs'))
-            utils.install_ssh_key('hdfs', cluster.ssh_key_standby())
-        elif not hookenv.is_leader():
-            cluster.send_ssh_key_standby(utils.get_ssh_key('hdfs'))
-            utils.install_ssh_key('hdfs', cluster.ssh_key_active())
     if ha_node_state:
         if not 'ctive' in ha_node_state or not 'andby' in ha_node_state:
             ha_node_state = 'undefined'
@@ -147,6 +140,9 @@ def configure_ha(cluster, datanode, zookeeper, *args):
             hdfs.register_journalnodes(jn_nodes, jn_port)
         #if ha_node_state == 'active':
         if hookenv.is_leader():
+            cluster.send_ssh_key_active(utils.get_ssh_key('hdfs'))
+            if cluster.ssh_key_standby():
+                utils.install_ssh_key('hdfs', cluster.ssh_key_standby())
             if not is_state('namenode.shared-edits.init'): # and if not namenode.standby.bootstrapped?
                 utils.update_kv_hosts(cluster.hosts_map())
                 utils.manage_etc_hosts()
@@ -163,6 +159,8 @@ def configure_ha(cluster, datanode, zookeeper, *args):
                 # 'leader' appears to transition back to standby after restart - test more
         # elif ha_node_state == 'standby':
         elif not hookenv.is_leader():
+            cluster.send_ssh_key_standby(utils.get_ssh_key('hdfs'))
+            utils.install_ssh_key('hdfs', cluster.ssh_key_active())
             if not is_state('namenode.standby.bootstrapped') and cluster.are_jns_init():
                 utils.update_kv_hosts(cluster.hosts_map())
                 utils.manage_etc_hosts()
