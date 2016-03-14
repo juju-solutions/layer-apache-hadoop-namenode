@@ -115,6 +115,7 @@ def send_info(datanode):
 
 @when('namenode-cluster.joined', 'datanode.journalnode.joined', 'zookeeper.ready')
 def configure_ha(cluster, datanode, zookeeper, *args):
+    cluster.send_ssh_key(utils.get_ssh_key('hdfs'))
     cluster_nodes = cluster.nodes()
     cluster.send_ssh_key(utils.get_ssh_key('hdfs'))
     zookeeper_nodes = zookeeper.zookeepers()
@@ -145,6 +146,7 @@ def configure_ha(cluster, datanode, zookeeper, *args):
         #if ha_node_state == 'active':
         if hookenv.is_leader():
             if not is_state('namenode.shared-edits.init'): # and if not namenode.standby.bootstrapped?
+                utils.install_ssh_key('hdfs', cluster.ssh_key())
                 utils.update_kv_hosts(cluster.hosts_map())
                 utils.manage_etc_hosts()
                 hdfs.stop_namenode()
@@ -161,6 +163,7 @@ def configure_ha(cluster, datanode, zookeeper, *args):
         # elif ha_node_state == 'standby':
         elif not hookenv.is_leader():
             if not is_state('namenode.standby.bootstrapped') and cluster.are_jns_init():
+                utils.install_ssh_key('hdfs', cluster.ssh_key())
                 utils.update_kv_hosts(cluster.hosts_map())
                 utils.manage_etc_hosts()
                 hdfs.stop_namenode()
