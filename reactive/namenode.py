@@ -157,7 +157,7 @@ def journalnodes_depart(*args):
 
 
 @when('namenode-cluster.joined', 'zookeeper.ready', 'namenode-cluster.configured', 'journalnodes.quorum')
-def initialize_ha(cluster, datanode, zookeeper, *args):
+def initialize_ha(cluster, zookeeper, *args):
     hadoop = get_hadoop_base()
     hdfs = HDFS(hadoop)
     if not get_state('hdfs.ha.initialized'):
