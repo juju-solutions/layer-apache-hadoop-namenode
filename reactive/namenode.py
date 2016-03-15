@@ -150,7 +150,7 @@ def configure_journalnodes(cluster, datanode):
             set_state('journalnodes.quorum')
         else:
             remove_state('journalnodes.quorum')
-            hookenv.status_set('waiting', 'Waiting for 3 slaves to initialize HDFS HA')
+            hookenv.status_set('waiting', 'Waiting for journalnode quorum')
 
 
 @when('namenode.started', 'namenode.shared-edits.init')
@@ -169,18 +169,14 @@ def journalnodes_depart(*args):
 def initialize_ha(cluster, zookeeper, *args):
     hadoop = get_hadoop_base()
     hdfs = HDFS(hadoop)
-    #if not get_state('hdfs.ha.initialized'):
-    #    hdfs.restart_namenode()
     if hookenv.is_leader():
         if not is_state('namenode.shared-edits.init'):
-            #local_hostname = hookenv.local_unit().replace('/', '-')
-            #cluster_nodes = cluster.nodes()
             hdfs.stop_namenode()
             hdfs.init_sharededits()
             set_state('namenode.shared-edits.init')
             remove_state('hdfs.degraded')
             set_state('hdfs.ha.initialized')
-            #hdfs.ensure_HA_active(cluster_nodes, local_hostname)
+            hookenv.status_set('waiting', 'Journalnode Shared Edits initialized, waiting for zookeeper')
     elif not hookenv.is_leader():
         if not is_state('namenode.standby.bootstrapped') and cluster.are_jns_init():
             utils.update_kv_hosts(cluster.hosts_map())
@@ -192,6 +188,7 @@ def initialize_ha(cluster, zookeeper, *args):
             set_state('namenode.standby.bootstrapped')
             remove_state('hdfs.degraded')
             set_state('hdfs.ha.initialized')
+            hookenv.status_set('waiting', 'Waiting for leader to enable Automatic Failover')
 
 
 @when('namenode.started', 'namenode-cluster.joined', 'zookeeper.ready', 'hdfs.ha.initialized')
@@ -208,6 +205,7 @@ def configure_zookeeper(cluster, zookeeper):
             set_state('dn.queue.restart')
         hdfs.restart_zookeeper()
         hdfs.start_namenode()
+        hookenv.status_set('active', 'Automatic Failover Enabled')
 
 
 @when('datanode.journalnode.joined', 'dn.queue.restart', 'namenode.standby.bootstrapped')
