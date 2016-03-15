@@ -132,17 +132,6 @@ def cluster_degraded(cluster):
     remove_state('namenode-cluster.configured')
 
 
-@when('namenode.started', 'namenode-cluster.joined', 'zookeeper.ready', 'hdfs.ha.initialized')
-def configure_zookeeper(cluster, zookeeper):
-    zookeeper_nodes = zookeeper.zookeepers()
-    if data_changed('zookeepers', zookeeper_nodes):
-        hadoop = get_hadoop_base()
-        hdfs = HDFS(hadoop)
-        hdfs.configure_zookeeper(zookeeper_nodes)
-        hdfs.format_zookeeper()
-        hdfs.restart_zookeeper()
-
-
 @when('namenode.started', 'namenode-cluster.joined', 'datanode.journalnode.joined')
 def configure_journalnodes(cluster, datanode):
     jn_nodes = datanode.nodes()
@@ -153,45 +142,63 @@ def configure_journalnodes(cluster, datanode):
         hadoop = get_hadoop_base()
         hdfs = HDFS(hadoop)
         hdfs.register_journalnodes(jn_nodes, jn_port)
+        if datanode.journalnodes_quorum():
+            set_state('journalnodes.quorum')
+        else:
+            remove_state('journalnodes.quorum')
+            hookenv.status_set('waiting', 'Waiting for 3 slaves to initialize HDFS HA')
+            remove_state('namenode.shared-edits.init')
 
 
-@when('namenode-cluster.joined', 'datanode.journalnode.joined', 'zookeeper.ready', 'namenode-cluster.configured')
-def enable_ha(cluster, datanode, zookeeper, *args):
+@when('namenode.started', 'namenode-cluster.joined')
+@when_not('datanode.journalnode.joined')
+def journalnodes_depart(*args):
+    remove_state('journalnodes.quorum')
+
+
+@when('namenode-cluster.joined', 'zookeeper.ready', 'namenode-cluster.configured', 'journalnodes.quorum')
+def initialize_ha(cluster, datanode, zookeeper, *args):
     hadoop = get_hadoop_base()
     hdfs = HDFS(hadoop)
-    if datanode.journalnodes_quorum():
-        if not get_state('hdfs.ha.initialized'):
-            hdfs.restart_namenode()
-        if hookenv.is_leader():
-            if not is_state('namenode.shared-edits.init'):
-                hdfs.stop_namenode()
-                hdfs.init_sharededits()
-                set_state('namenode.shared-edits.init')
-                cluster.jns_init()
-                hdfs.start_namenode()
-                remove_state('hdfs.degraded')
-                # what happens when this runs again?
-                #hdfs.start_zookeeper()
-                #hdfs.ensure_HA_active(cluster_nodes, local_hostname)
-                set_state('hdfs.ha.initialized')
-        elif not hookenv.is_leader():
-            if not is_state('namenode.standby.bootstrapped') and cluster.are_jns_init():
-                utils.update_kv_hosts(cluster.hosts_map())
-                utils.manage_etc_hosts()
-                hdfs.stop_namenode()
-                hdfs.format_namenode()
-                hdfs.bootstrap_standby()
-                #hdfs.start_zookeeper()
-                hdfs.start_namenode()
-                # REVIEW - is this the best place to queue a restart of the datanode to apply config?
-                set_state('dn.queue.restart')
-                set_state('namenode.standby.bootstrapped')
-                remove_state('hdfs.degraded')
-                set_state('hdfs.ha.initialized')
-    else:
-        # following line untested
-        remove_state('namenode.shared-edits.init')
-        hookenv.status_set('waiting', 'Waiting for 3 slaves to initialize HDFS HA')
+    if not get_state('hdfs.ha.initialized'):
+        hdfs.restart_namenode()
+    if hookenv.is_leader():
+        if not is_state('namenode.shared-edits.init'):
+            hdfs.stop_namenode()
+            hdfs.init_sharededits()
+            set_state('namenode.shared-edits.init')
+            cluster.jns_init()
+            hdfs.start_namenode()
+            remove_state('hdfs.degraded')
+            # what happens when this runs again?
+            #hdfs.start_zookeeper()
+            #hdfs.ensure_HA_active(cluster_nodes, local_hostname)
+            set_state('hdfs.ha.initialized')
+    elif not hookenv.is_leader():
+        if not is_state('namenode.standby.bootstrapped') and cluster.are_jns_init():
+            utils.update_kv_hosts(cluster.hosts_map())
+            utils.manage_etc_hosts()
+            hdfs.stop_namenode()
+            hdfs.format_namenode()
+            hdfs.bootstrap_standby()
+            #hdfs.start_zookeeper()
+            hdfs.start_namenode()
+            # REVIEW - is this the best place to queue a restart of the datanode to apply config?
+            set_state('dn.queue.restart')
+            set_state('namenode.standby.bootstrapped')
+            remove_state('hdfs.degraded')
+            set_state('hdfs.ha.initialized')
+
+
+@when('namenode.started', 'namenode-cluster.joined', 'zookeeper.ready', 'hdfs.ha.initialized')
+def configure_zookeeper(cluster, zookeeper):
+    zookeeper_nodes = zookeeper.zookeepers()
+    if data_changed('zookeepers', zookeeper_nodes):
+        hadoop = get_hadoop_base()
+        hdfs = HDFS(hadoop)
+        hdfs.configure_zookeeper(zookeeper_nodes)
+        hdfs.format_zookeeper()
+        hdfs.restart_zookeeper()
 
 
 @when('datanode.journalnode.joined', 'dn.queue.restart', 'namenode.standby.bootstrapped')
