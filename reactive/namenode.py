@@ -190,7 +190,6 @@ def initialize_ha(cluster, zookeeper, *args):
             hdfs.stop_namenode()
             hdfs.format_namenode()
             hdfs.bootstrap_standby()
-            hdfs.start_namenode()
             # REVIEW - is this the best place to queue a restart of the datanode to apply config?
             set_state('namenode.standby.bootstrapped')
             remove_state('hdfs.degraded')
@@ -204,8 +203,8 @@ def configure_zookeeper(cluster, zookeeper):
         hadoop = get_hadoop_base()
         hdfs = HDFS(hadoop)
         hdfs.configure_zookeeper(zookeeper_nodes)
-        hdfs.stop_namenode()
         if hookenv.is_leader():
+            hdfs.stop_namenode()
             hdfs.format_zookeeper()
         else:
             set_state('dn.queue.restart')
