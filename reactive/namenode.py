@@ -150,7 +150,12 @@ def configure_journalnodes(cluster, datanode):
         else:
             remove_state('journalnodes.quorum')
             hookenv.status_set('waiting', 'Waiting for 3 slaves to initialize HDFS HA')
-            remove_state('namenode.shared-edits.init')
+
+
+@when('namenode.started', 'namenode.shared-edits.init')
+@when_not('journalnodes.quorum')
+def journalnodes_quorum_degraded(*args):
+    remove_state('namenode.shared-edits.init')
 
 
 @when('namenode.started', 'namenode-cluster.joined')
