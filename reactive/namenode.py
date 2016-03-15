@@ -141,7 +141,7 @@ def configure_ha(cluster, datanode, zookeeper, *args):
         if hookenv.is_leader():
             cluster.send_ssh_key(utils.get_ssh_key('hdfs'))
             if cluster.ssh_key():
-                utils.install_ssh_key('hdfs', cluster.ssh_key_standby())
+                utils.install_ssh_key('hdfs', cluster.ssh_key())
             if not is_state('namenode.shared-edits.init'): # and if not namenode.standby.bootstrapped?
                 utils.update_kv_hosts(cluster.hosts_map())
                 utils.manage_etc_hosts()
@@ -159,7 +159,7 @@ def configure_ha(cluster, datanode, zookeeper, *args):
         # elif ha_node_state == 'standby':
         elif not hookenv.is_leader():
             cluster.send_ssh_key(utils.get_ssh_key('hdfs'))
-            utils.install_ssh_key('hdfs', cluster.ssh_key_active())
+            utils.install_ssh_key('hdfs', cluster.ssh_key())
             if not is_state('namenode.standby.bootstrapped') and cluster.are_jns_init():
                 utils.update_kv_hosts(cluster.hosts_map())
                 utils.manage_etc_hosts()
