@@ -127,7 +127,7 @@ def configure_cluster(cluster):
 
 @when('namenode.started')
 @when_not('namenode-cluster.joined')
-def cluster_degraded(cluster):
+def cluster_degraded():
     set_state('hdfs.degraded')
     remove_state('namenode-cluster.configured')
 
