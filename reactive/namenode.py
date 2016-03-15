@@ -113,70 +113,85 @@ def send_info(datanode):
     set_state('namenode.ready')
 
 
-@when('namenode-cluster.joined', 'datanode.journalnode.joined', 'zookeeper.ready')
-def configure_ha(cluster, datanode, zookeeper, *args):
+@when('namenode.started', 'namenode-cluster.joined')
+def configure_cluster(cluster):
     cluster_nodes = cluster.nodes()
+    if data_changed('cluster.joined', cluster_nodes):
+        utils.update_kv_hosts(cluster.hosts_map())
+        utils.manage_etc_hosts()
+        cluster.send_ssh_key(utils.get_ssh_key('hdfs'))
+        if cluster.ssh_key():
+            utils.install_ssh_key('hdfs', cluster.ssh_key())
+        set_state('namenode-cluster.configured')
+
+
+@when('namenode.started')
+@when_not('namenode-cluster.joined')
+def cluster_degraded(cluster):
+    set_state('hdfs.degraded')
+    remove_state('namenode-cluster.configured')
+
+
+@when('namenode.started', 'namenode-cluster.joined', 'zookeeper.ready', 'hdfs.ha.initialized')
+def configure_zookeeper(cluster, zookeeper):
     zookeeper_nodes = zookeeper.zookeepers()
+    if data_changed('zookeepers', zookeeper_nodes):
+        hadoop = get_hadoop_base()
+        hdfs = HDFS(hadoop)
+        hdfs.configure_zookeeper(zookeeper_nodes)
+        hdfs.format_zookeeper()
+        hdfs.restart_zookeeper()
+
+
+@when('namenode.started', 'namenode-cluster.joined', 'datanode.journalnode.joined')
+def configure_journalnodes(cluster, datanode):
     jn_nodes = datanode.nodes()
     jn_port = datanode.jn_port()
+    if data_changed('journalnodes', [jn_nodes, jn_port]):
+        utils.update_kv_hosts(cluster.hosts_map())
+        utils.manage_etc_hosts()
+        hadoop = get_hadoop_base()
+        hdfs = HDFS(hadoop)
+        hdfs.register_journalnodes(jn_nodes, jn_port)
+
+
+@when('namenode-cluster.joined', 'datanode.journalnode.joined', 'zookeeper.ready', 'namenode-cluster.configured')
+def enable_ha(cluster, datanode, zookeeper, *args):
     hadoop = get_hadoop_base()
     hdfs = HDFS(hadoop)
-    local_hostname = hookenv.local_unit().replace('/', '-')
-    ha_node_state = utils.ha_node_state(local_hostname)
-    if ha_node_state:
-        if not 'ctive' in ha_node_state or not 'andby' in ha_node_state:
-            ha_node_state = 'undefined'
     if datanode.journalnodes_quorum():
-        if data_changed('namenode.ha', cluster_nodes):
-            utils.update_kv_hosts(cluster.hosts_map())
-            utils.manage_etc_hosts()
-            datanode.send_namenodes(cluster_nodes)
-            hdfs.configure_namenode(cluster_nodes, zookeeper_nodes)
-            if not get_state('hdfs.ha.initialized'):
-                hdfs.restart_namenode()
-        if data_changed('journalnodes', [jn_nodes, jn_port]):
-            utils.update_kv_hosts(cluster.hosts_map())
-            utils.manage_etc_hosts()
-            hdfs.register_journalnodes(jn_nodes, jn_port)
+        if not get_state('hdfs.ha.initialized'):
+            hdfs.restart_namenode()
         if hookenv.is_leader():
-            cluster.send_ssh_key(utils.get_ssh_key('hdfs'))
-            if cluster.ssh_key():
-                utils.install_ssh_key('hdfs', cluster.ssh_key())
-            if not is_state('namenode.shared-edits.init'): # and if not namenode.standby.bootstrapped?
-                utils.update_kv_hosts(cluster.hosts_map())
-                utils.manage_etc_hosts()
+            if not is_state('namenode.shared-edits.init'):
                 hdfs.stop_namenode()
                 hdfs.init_sharededits()
                 set_state('namenode.shared-edits.init')
                 cluster.jns_init()
                 hdfs.start_namenode()
                 remove_state('hdfs.degraded')
-                hdfs.format_zookeeper()
-                hdfs.start_zookeeper()
-                # following is required at least if no namenode was already configured
+                # what happens when this runs again?
+                #hdfs.start_zookeeper()
                 #hdfs.ensure_HA_active(cluster_nodes, local_hostname)
-                # 'leader' appears to transition back to standby after restart - test more
-        # elif ha_node_state == 'standby':
+                set_state('hdfs.ha.initialized')
         elif not hookenv.is_leader():
-            cluster.send_ssh_key(utils.get_ssh_key('hdfs'))
-            utils.install_ssh_key('hdfs', cluster.ssh_key())
             if not is_state('namenode.standby.bootstrapped') and cluster.are_jns_init():
                 utils.update_kv_hosts(cluster.hosts_map())
                 utils.manage_etc_hosts()
                 hdfs.stop_namenode()
                 hdfs.format_namenode()
                 hdfs.bootstrap_standby()
-                hdfs.start_zookeeper()
+                #hdfs.start_zookeeper()
                 hdfs.start_namenode()
                 # REVIEW - is this the best place to queue a restart of the datanode to apply config?
                 set_state('dn.queue.restart')
                 set_state('namenode.standby.bootstrapped')
                 remove_state('hdfs.degraded')
+                set_state('hdfs.ha.initialized')
     else:
         # following line untested
         remove_state('namenode.shared-edits.init')
         hookenv.status_set('waiting', 'Waiting for 3 slaves to initialize HDFS HA')
-    set_state('hdfs.ha.initialized')
 
 
 @when('datanode.journalnode.joined', 'dn.queue.restart', 'namenode.standby.bootstrapped')
