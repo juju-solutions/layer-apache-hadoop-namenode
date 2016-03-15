@@ -178,8 +178,6 @@ def initialize_ha(cluster, zookeeper, *args):
             hdfs.stop_namenode()
             hdfs.init_sharededits()
             set_state('namenode.shared-edits.init')
-            hdfs.start_namenode()
-            cluster.jns_init()
             remove_state('hdfs.degraded')
             set_state('hdfs.ha.initialized')
             #hdfs.ensure_HA_active(cluster_nodes, local_hostname)
@@ -204,8 +202,8 @@ def configure_zookeeper(cluster, zookeeper):
         hdfs = HDFS(hadoop)
         hdfs.configure_zookeeper(zookeeper_nodes)
         if hookenv.is_leader():
-            hdfs.stop_namenode()
             hdfs.format_zookeeper()
+            cluster.jns_init()
         else:
             set_state('dn.queue.restart')
         hdfs.restart_zookeeper()
