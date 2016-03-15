@@ -173,7 +173,7 @@ def initialize_ha(cluster, zookeeper, *args):
             cluster.jns_init()
             hdfs.start_namenode()
             remove_state('hdfs.degraded')
-            #hdfs.ensure_HA_active(cluster_nodes, local_hostname)
+            hdfs.ensure_HA_active(cluster_nodes, local_hostname)
             set_state('hdfs.ha.initialized')
     elif not hookenv.is_leader():
         if not is_state('namenode.standby.bootstrapped') and cluster.are_jns_init():
