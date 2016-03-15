@@ -167,6 +167,8 @@ def initialize_ha(cluster, zookeeper, *args):
         hdfs.restart_namenode()
     if hookenv.is_leader():
         if not is_state('namenode.shared-edits.init'):
+            local_hostname = hookenv.local_unit().replace('/', '-')
+            cluster_nodes = cluster.nodes()
             hdfs.stop_namenode()
             hdfs.init_sharededits()
             set_state('namenode.shared-edits.init')
