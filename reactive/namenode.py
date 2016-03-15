@@ -116,7 +116,8 @@ def send_info(datanode):
 @when('namenode.started', 'namenode-cluster.joined')
 def configure_cluster(cluster):
     cluster_nodes = cluster.nodes()
-    if data_changed('cluster.joined', cluster_nodes):
+    cluster_keys = cluster.ssh_key()
+    if data_changed('cluster.joined', cluster_nodes, cluster_keys):
         hadoop = get_hadoop_base()
         hdfs = HDFS(hadoop)
         utils.update_kv_hosts(cluster.hosts_map())
