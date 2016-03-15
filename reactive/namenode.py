@@ -197,7 +197,8 @@ def configure_zookeeper(cluster, zookeeper):
         hadoop = get_hadoop_base()
         hdfs = HDFS(hadoop)
         hdfs.configure_zookeeper(zookeeper_nodes)
-        hdfs.format_zookeeper()
+        if hookenv.is_leader():
+            hdfs.format_zookeeper()
         hdfs.restart_zookeeper()
 
 
