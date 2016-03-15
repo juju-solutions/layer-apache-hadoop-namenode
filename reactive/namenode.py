@@ -125,9 +125,9 @@ def configure_cluster(cluster):
         set_state('namenode-cluster.configured')
 
 
-@when('namenode.started')
+@when('namenode.started', 'namenode-cluster.initialized')
 @when_not('namenode-cluster.joined')
-def cluster_degraded():
+def cluster_degraded(*args):
     set_state('hdfs.degraded')
     remove_state('namenode-cluster.configured')
 
@@ -170,8 +170,6 @@ def initialize_ha(cluster, datanode, zookeeper, *args):
             cluster.jns_init()
             hdfs.start_namenode()
             remove_state('hdfs.degraded')
-            # what happens when this runs again?
-            #hdfs.start_zookeeper()
             #hdfs.ensure_HA_active(cluster_nodes, local_hostname)
             set_state('hdfs.ha.initialized')
     elif not hookenv.is_leader():
@@ -181,7 +179,6 @@ def initialize_ha(cluster, datanode, zookeeper, *args):
             hdfs.stop_namenode()
             hdfs.format_namenode()
             hdfs.bootstrap_standby()
-            #hdfs.start_zookeeper()
             hdfs.start_namenode()
             # REVIEW - is this the best place to queue a restart of the datanode to apply config?
             set_state('dn.queue.restart')
