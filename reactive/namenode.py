@@ -163,20 +163,20 @@ def journalnodes_depart(*args):
 def initialize_ha(cluster, zookeeper, *args):
     hadoop = get_hadoop_base()
     hdfs = HDFS(hadoop)
-    if not get_state('hdfs.ha.initialized'):
-        hdfs.restart_namenode()
+    #if not get_state('hdfs.ha.initialized'):
+    #    hdfs.restart_namenode()
     if hookenv.is_leader():
         if not is_state('namenode.shared-edits.init'):
-            local_hostname = hookenv.local_unit().replace('/', '-')
-            cluster_nodes = cluster.nodes()
+            #local_hostname = hookenv.local_unit().replace('/', '-')
+            #cluster_nodes = cluster.nodes()
             hdfs.stop_namenode()
             hdfs.init_sharededits()
             set_state('namenode.shared-edits.init')
-            cluster.jns_init()
             hdfs.start_namenode()
+            cluster.jns_init()
             remove_state('hdfs.degraded')
-            hdfs.ensure_HA_active(cluster_nodes, local_hostname)
             set_state('hdfs.ha.initialized')
+            #hdfs.ensure_HA_active(cluster_nodes, local_hostname)
     elif not hookenv.is_leader():
         if not is_state('namenode.standby.bootstrapped') and cluster.are_jns_init():
             utils.update_kv_hosts(cluster.hosts_map())
