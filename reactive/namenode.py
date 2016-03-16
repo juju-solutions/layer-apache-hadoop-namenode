@@ -150,8 +150,8 @@ def configure_journalnodes(cluster, datanode):
         set_state('journalnode.registered')
 
 
-@when('journalnode.registered')
-def journalnode_quorum(cluster, datanode):
+@when('namenode.started', 'namenode-cluster.joined', 'journalnode.registered')
+def journalnode_quorum(cluster):
     if datanode.journalnodes_quorum():
         set_state('journalnodes.quorum')
     else:
