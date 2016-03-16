@@ -139,7 +139,7 @@ def configure_cluster(cluster):
         utils.manage_etc_hosts()
         hdfs.configure_namenode(cluster_nodes)
     if cluster_keys:
-        if data_changed('cluster.keys'), cluster_keys]):
+        if data_changed('cluster.keys', cluster_keys):
             utils.install_ssh_key('hdfs', cluster.ssh_key())
             set_state('namenode-cluster.configured')
 
