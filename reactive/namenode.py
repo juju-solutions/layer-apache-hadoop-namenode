@@ -136,6 +136,7 @@ def cluster_degraded(*args):
     remove_state('namenode-cluster.configured')
 
 
+
 @when('namenode.started', 'namenode-cluster.joined', 'datanode.journalnode.joined')
 def configure_journalnodes(cluster, datanode):
     jn_nodes = datanode.nodes()
@@ -146,11 +147,16 @@ def configure_journalnodes(cluster, datanode):
         hadoop = get_hadoop_base()
         hdfs = HDFS(hadoop)
         hdfs.register_journalnodes(jn_nodes, jn_port)
-        if datanode.journalnodes_quorum():
-            set_state('journalnodes.quorum')
-        else:
-            remove_state('journalnodes.quorum')
-            hookenv.status_set('waiting', 'Waiting for journalnode quorum')
+        set_state('journalnode.registered')
+
+
+@when('journalnode.registered')
+def journalnode_quorum(cluster, datanode):
+    if datanode.journalnodes_quorum():
+        set_state('journalnodes.quorum')
+    else:
+        remove_state('journalnodes.quorum')
+        hookenv.status_set('waiting', 'Waiting for journalnode quorum')
 
 
 @when('namenode.started', 'namenode.shared-edits.init')
