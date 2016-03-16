@@ -39,7 +39,19 @@ class TimeoutError(Exception):
     pass
 
 
+@when('namenode.started', 'namenode-cluster.initialized')
+def check_ha_state(cluster):
+    hadoop = get_hadoop_base()
+    hdfs_port = hadoop.dist_config.port('namenode')
+    if cluster.check_peer_port(hdfs_port):
+        remove_state('hdfs.degraded')
+    else:
+        set_state('hdfs.degraded')
+        hookenv.status_set('waiting', 'HDFS HA degraded - waiting for peer...')
+
+
 @when('namenode.started', 'datanode.joined', 'namenode-cluster.initialized')
+@when_not('hdfs.degraded')
 def send_info_ha(datanode, cluster):
     hadoop = get_hadoop_base()
     hdfs = HDFS(hadoop)
@@ -58,12 +70,14 @@ def send_info_ha(datanode, cluster):
     datanode.send_hosts_map(utils.get_kv_hosts())
 
     slaves = datanode.nodes()
+    # the following is tricky. If slaves change while a namenode is down/gone
+    # this will fail. 
+
     if data_changed('namenode.slaves', slaves):
         hookenv.log("Waiting for other namenode...")
         start = time.time()
         while time.time() - start < 120:
             if cluster.check_peer_port(hdfs_port):
-                remove_state('hdfs.degraded')
                 unitdata.kv().set('namenode.slaves', slaves)
                 hdfs.register_slaves(slaves)
                 hdfs.reload_slaves()
