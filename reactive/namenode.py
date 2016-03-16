@@ -117,14 +117,15 @@ def send_info(datanode):
 def configure_cluster(cluster):
     cluster_nodes = cluster.nodes()
     cluster_keys = cluster.ssh_key()
-    if data_changed('cluster.joined', [cluster_nodes, cluster_keys]):
+    cluster.send_ssh_key(utils.get_ssh_key('hdfs'))
+    if data_changed('cluster.joined', cluster_nodes):
         hadoop = get_hadoop_base()
         hdfs = HDFS(hadoop)
         utils.update_kv_hosts(cluster.hosts_map())
         utils.manage_etc_hosts()
         hdfs.configure_namenode(cluster_nodes)
-        cluster.send_ssh_key(utils.get_ssh_key('hdfs'))
-        if cluster_keys:
+    if cluster_keys:
+        if data_changed('cluster.keys'), cluster_keys]):
             utils.install_ssh_key('hdfs', cluster.ssh_key())
             set_state('namenode-cluster.configured')
 
@@ -156,7 +157,6 @@ def journalnode_quorum(cluster, datanode):
         set_state('journalnodes.quorum')
     else:
         remove_state('journalnodes.quorum')
-        hookenv.status_set('waiting', 'Waiting for journalnode quorum')
 
 
 @when('namenode.started', 'namenode.shared-edits.init')
