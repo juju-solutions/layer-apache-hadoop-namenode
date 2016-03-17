@@ -193,6 +193,7 @@ def initialize_ha(cluster, zookeeper, *args):
             set_state('namenode.shared-edits.init')
             remove_state('hdfs.degraded')
             set_state('hdfs.ha.initialized')
+            set_state('start.namenode')
             hookenv.status_set('waiting', 'Journalnode Shared Edits initialized, waiting for zookeeper')
     elif not hookenv.is_leader():
         if not is_state('namenode.standby.bootstrapped') and cluster.are_jns_init():
@@ -204,6 +205,7 @@ def initialize_ha(cluster, zookeeper, *args):
             set_state('namenode.standby.bootstrapped')
             remove_state('hdfs.degraded')
             set_state('hdfs.ha.initialized')
+            set_state('start.namenode')
             hookenv.status_set('waiting', 'Waiting for leader to enable Automatic Failover')
 
 
@@ -221,16 +223,30 @@ def configure_zookeeper(cluster, zookeeper):
                 cluster.jns_init()
                 cluster.zookeeper_formatted()
                 set_state('zookeeper.formatted')
-                hdfs.restart_zookeeper()
-                hdfs.start_namenode()
+                hdfs.start_zookeeper()
                 hookenv.status_set('active', 'Automatic Failover Enabled')
     else:
         if cluster.is_zookeeper_formatted():
             set_state('dn.queue.restart')
             set_state('zookeeper.formatted')
-            hdfs.restart_zookeeper()
-            hdfs.start_namenode()
+            hdfs.start_zookeeper()
             hookenv.status_set('active', 'Automatic Failover Enabled')
+
+
+@when('namenode.started', 'namenode-cluster.joined', 'hdfs.ha.initialized', 'zookeeper.formatted')
+@when_not('zookeeper.ready')
+def departed_zookeeper(cluster):
+    hadoop = get_hadoop_base()
+    hdfs = HDFS(hadoop)
+    hdfs.stop_zookeeper()
+    remove_state('zookeeper.formatted')
+
+@when('namenode.started', 'namenode.cluster-joined', 'zookeeper.formatted', 'start.namenode')
+def restart_namenode(cluster, zookeeper):
+    hadoop = get_hadoop_base()
+    hdfs = HDFS(hadoop)
+    hdfs.start_namenode()
+    remove_state('start.namenode')
 
 
 @when('datanode.journalnode.joined', 'dn.queue.restart', 'namenode.standby.bootstrapped')
