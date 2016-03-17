@@ -45,9 +45,6 @@ def check_ha_state(cluster):
     hdfs_port = hadoop.dist_config.port('namenode')
     if cluster.check_peer_port(hdfs_port):
         remove_state('hdfs.degraded')
-    else:
-        set_state('hdfs.degraded')
-        hookenv.status_set('waiting', 'HDFS HA degraded - waiting for peer...')
 
 
 @when('namenode.started', 'datanode.joined', 'namenode-cluster.initialized')
