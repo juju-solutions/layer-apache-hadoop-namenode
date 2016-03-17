@@ -211,11 +211,11 @@ def initialize_ha(cluster, zookeeper, *args):
 @when_not('zookeeper.formatted')
 def configure_zookeeper(cluster, zookeeper):
     zookeeper_nodes = zookeeper.zookeepers()
+    hadoop = get_hadoop_base()
+    hdfs = HDFS(hadoop)
+    hdfs.configure_zookeeper(zookeeper_nodes)
     if hookenv.is_leader():
         if data_changed('zookeepers', zookeeper_nodes):
-            hadoop = get_hadoop_base()
-            hdfs = HDFS(hadoop)
-            hdfs.configure_zookeeper(zookeeper_nodes)
             if hookenv.is_leader():
                 hdfs.format_zookeeper()
                 cluster.jns_init()
