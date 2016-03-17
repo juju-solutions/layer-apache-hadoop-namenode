@@ -201,7 +201,6 @@ def initialize_ha(cluster, zookeeper, *args):
             hdfs.stop_namenode()
             hdfs.format_namenode()
             hdfs.bootstrap_standby()
-            # REVIEW - is this the best place to queue a restart of the datanode to apply config?
             set_state('namenode.standby.bootstrapped')
             remove_state('hdfs.degraded')
             set_state('hdfs.ha.initialized')
@@ -209,20 +208,29 @@ def initialize_ha(cluster, zookeeper, *args):
 
 
 @when('namenode.started', 'namenode-cluster.joined', 'zookeeper.ready', 'hdfs.ha.initialized')
+@when_not('zookeeper.formatted')
 def configure_zookeeper(cluster, zookeeper):
     zookeeper_nodes = zookeeper.zookeepers()
-    if data_changed('zookeepers', zookeeper_nodes):
-        hadoop = get_hadoop_base()
-        hdfs = HDFS(hadoop)
-        hdfs.configure_zookeeper(zookeeper_nodes)
-        if hookenv.is_leader():
-            hdfs.format_zookeeper()
-            cluster.jns_init()
-        else:
+    if hookenv.is_leader():
+        if data_changed('zookeepers', zookeeper_nodes):
+            hadoop = get_hadoop_base()
+            hdfs = HDFS(hadoop)
+            hdfs.configure_zookeeper(zookeeper_nodes)
+            if hookenv.is_leader():
+                hdfs.format_zookeeper()
+                cluster.jns_init()
+                cluster.zookeeper_formatted()
+                set_state('zookeeper.formatted')
+                hdfs.restart_zookeeper()
+                hdfs.start_namenode()
+                hookenv.status_set('active', 'Automatic Failover Enabled')
+    else:
+        if cluster.is_zookeeper_formatted():
             set_state('dn.queue.restart')
-        hdfs.restart_zookeeper()
-        hdfs.start_namenode()
-        hookenv.status_set('active', 'Automatic Failover Enabled')
+            set_state('zookeeper.formatted')
+            hdfs.restart_zookeeper()
+            hdfs.start_namenode()
+            hookenv.status_set('active', 'Automatic Failover Enabled')
 
 
 @when('datanode.journalnode.joined', 'dn.queue.restart', 'namenode.standby.bootstrapped')
