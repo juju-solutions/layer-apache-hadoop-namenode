@@ -94,9 +94,9 @@ def send_info_ha(datanode, cluster):
     extended_status = 'HA'
     hookenv.status_set('active', 'Ready [{}] ({count} DataNode{s}) ({})'.format(
         position,
+        extended_status,
         count=len(slaves),
         s='s' if len(slaves) > 1 else '',
-        extended_status,
     ))
     set_state('namenode.ready')
 
@@ -127,9 +127,9 @@ def send_info(datanode):
         hdfs.reload_slaves()
 
     hookenv.status_set('active', 'Ready ({count} DataNode{s}) ({})'.format(
+        extended_status,
         count=len(slaves),
         s='s' if len(slaves) > 1 else '',
-        extended_status,
     ))
     set_state('namenode.ready')
 
