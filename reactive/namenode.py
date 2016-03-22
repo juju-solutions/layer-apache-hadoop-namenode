@@ -27,9 +27,8 @@ def configure_namenode():
     hadoop.open_ports('namenode')
     utils.update_kv_hosts({ip_addr: local_hostname})
     set_state('namenode.started')
-    global extended_status
-    extended_status = 'standalone'
-
+    unitdata.kv().set('extended.status', 'stand-alone')
+    unitdata.kv().flush(True)
 
 @when('namenode.started')
 @when_not('datanode.joined')
@@ -47,9 +46,11 @@ def check_ha_state(cluster):
     hdfs_port = hadoop.dist_config.port('namenode')
     if cluster.check_peer_port(hdfs_port):
         remove_state('hdfs.degraded')
+        unitdata.kv().set('extended.status', 'HA')
+        unitdata.kv().flush(True)
     else:
-        global extended_status
-        extended_status = 'HA degraded'
+        unitdata.kv().set('extended.status', 'Degraded HA')
+        unitdata.kv().flush(True)
  
 
 @when('namenode.started', 'datanode.joined', 'namenode-cluster.initialized')
@@ -90,8 +91,8 @@ def send_info_ha(datanode, cluster):
             time.sleep(2)
         raise TimeoutError('Timed out waiting for other namenode')
         
-    global extended_status
-    extended_status = 'HA'
+    extended_status = unitdata.kv().get('extended.status')
+    position = unitdata.kv().get('position')
     hookenv.status_set('active', 'Ready [{}] ({count} DataNode{s}) ({})'.format(
         position,
         extended_status,
@@ -125,7 +126,8 @@ def send_info(datanode):
         unitdata.kv().set('namenode.slaves', slaves)
         hdfs.register_slaves(slaves)
         hdfs.reload_slaves()
-
+    
+    extended_status = unitdata.kv().get('extended.status')
     hookenv.status_set('active', 'Ready ({count} DataNode{s}) ({})'.format(
         extended_status,
         count=len(slaves),
@@ -139,19 +141,20 @@ def configure_cluster(cluster):
     cluster_nodes = cluster.nodes()
     cluster_keys = cluster.ssh_key()
     cluster.send_ssh_key(utils.get_ssh_key('hdfs'))
-    global position
     if hookenv.is_leader():
-        position = 'Leader'
+        unitdata.kv().set('position', 'Leader')
+        unitdata.kv().flush(True)
     else:
-        position = 'Follower'
+        unitdata.kv().set('position', 'Follower')
+        unitdata.kv().flush(True)
     if data_changed('cluster.joined', cluster_nodes):
         hadoop = get_hadoop_base()
         hdfs = HDFS(hadoop)
         utils.update_kv_hosts(cluster.hosts_map())
         utils.manage_etc_hosts()
         hdfs.configure_namenode(cluster_nodes)
-        global extended_status
-        extended_status = 'clustered'
+        unitdata.kv().set('extended.status', 'clustered')
+        unitdata.kv().flush(True)
     if cluster_keys:
         if data_changed('cluster.keys', cluster_keys):
             utils.install_ssh_key('hdfs', cluster.ssh_key())
@@ -208,7 +211,7 @@ def leader_initialize_journalnodes(cluster, zookeeper, *args):
         hdfs.init_sharededits()
         set_state('namenode.shared-edits.init')
         remove_state('hdfs.degraded')
-        set_state('hdfs.ha.initialized')
+        set_state('journalnodes.initialized')
         set_state('start.namenode')
         hookenv.status_set('waiting', 'Journalnode Shared Edits initialized, waiting for zookeeper')
 
@@ -227,12 +230,12 @@ def nonleader_bootstrap_standby(cluster, zookeeper, *args):
             hdfs.bootstrap_standby()
             set_state('namenode.standby.bootstrapped')
             remove_state('hdfs.degraded')
-            set_state('hdfs.ha.initialized')
+            set_state('journalnodes.initialized')
             set_state('start.namenode')
             hookenv.status_set('waiting', 'Waiting for leader to enable Automatic Failover')
 
 
-@when('namenode.started', 'namenode-cluster.joined', 'zookeeper.ready', 'hdfs.ha.initialized')
+@when('namenode.started', 'namenode-cluster.joined', 'zookeeper.ready', 'journalnodes.initialized')
 @when_not('zookeeper.formatted')
 def configure_zookeeper(cluster, zookeeper):
     zookeeper_nodes = zookeeper.zookeepers()
@@ -259,7 +262,7 @@ def configure_zookeeper(cluster, zookeeper):
                 hookenv.status_set('active', 'Automatic Failover Enabled')
 
 
-@when('namenode.started', 'namenode-cluster.joined', 'hdfs.ha.initialized', 'zookeeper.formatted')
+@when('namenode.started', 'namenode-cluster.joined', 'journalnodes.initialized', 'zookeeper.formatted')
 @when_not('zookeeper.ready')
 def departed_zookeeper(cluster):
     hadoop = get_hadoop_base()
@@ -268,7 +271,7 @@ def departed_zookeeper(cluster):
     remove_state('zookeeper.formatted')
 
 @when('namenode.started', 'namenode-cluster.joined', 'zookeeper.formatted', 'start.namenode')
-def post_zookeeper_setup(cluster):
+def post_zookeeper_actions(cluster):
     hadoop = get_hadoop_base()
     hdfs = HDFS(hadoop)
     hdfs.start_namenode()
