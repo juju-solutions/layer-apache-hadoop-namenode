@@ -27,6 +27,8 @@ def configure_namenode():
     hadoop.open_ports('namenode')
     utils.update_kv_hosts({ip_addr: local_hostname})
     set_state('namenode.started')
+    global extended_status
+    extended_status = 'standalone'
 
 
 @when('namenode.started')
@@ -45,7 +47,10 @@ def check_ha_state(cluster):
     hdfs_port = hadoop.dist_config.port('namenode')
     if cluster.check_peer_port(hdfs_port):
         remove_state('hdfs.degraded')
-
+    else:
+        global extended_status
+        extended_status = 'HA degraded'
+ 
 
 @when('namenode.started', 'datanode.joined', 'namenode-cluster.initialized')
 @when_not('hdfs.degraded')
@@ -85,9 +90,13 @@ def send_info_ha(datanode, cluster):
             time.sleep(2)
         raise TimeoutError('Timed out waiting for other namenode')
         
-    hookenv.status_set('active', 'Ready ({count} DataNode{s}) (clustered)'.format(
+    global extended_status
+    extended_status = 'HA'
+    hookenv.status_set('active', 'Ready [{}] ({count} DataNode{s}) ({})'.format(
+        position,
         count=len(slaves),
         s='s' if len(slaves) > 1 else '',
+        extended_status,
     ))
     set_state('namenode.ready')
 
@@ -117,9 +126,10 @@ def send_info(datanode):
         hdfs.register_slaves(slaves)
         hdfs.reload_slaves()
 
-    hookenv.status_set('active', 'Ready ({count} DataNode{s})'.format(
+    hookenv.status_set('active', 'Ready ({count} DataNode{s}) ({})'.format(
         count=len(slaves),
         s='s' if len(slaves) > 1 else '',
+        extended_status,
     ))
     set_state('namenode.ready')
 
@@ -129,12 +139,19 @@ def configure_cluster(cluster):
     cluster_nodes = cluster.nodes()
     cluster_keys = cluster.ssh_key()
     cluster.send_ssh_key(utils.get_ssh_key('hdfs'))
+    global position
+    if hookenv.is_leader():
+        position = 'Leader'
+    else:
+        position = 'Follower'
     if data_changed('cluster.joined', cluster_nodes):
         hadoop = get_hadoop_base()
         hdfs = HDFS(hadoop)
         utils.update_kv_hosts(cluster.hosts_map())
         utils.manage_etc_hosts()
         hdfs.configure_namenode(cluster_nodes)
+        global extended_status
+        extended_status = 'clustered'
     if cluster_keys:
         if data_changed('cluster.keys', cluster_keys):
             utils.install_ssh_key('hdfs', cluster.ssh_key())
@@ -146,7 +163,6 @@ def configure_cluster(cluster):
 def cluster_degraded(*args):
     set_state('hdfs.degraded')
     remove_state('namenode-cluster.configured')
-
 
 
 @when('namenode.started', 'namenode-cluster.joined', 'datanode.journalnode.joined')
@@ -250,7 +266,7 @@ def departed_zookeeper(cluster):
     hdfs.stop_zookeeper()
     remove_state('zookeeper.formatted')
 
-@when('namenode.started', 'namenode.cluster-joined', 'zookeeper.formatted', 'start.namenode')
+@when('namenode.started', 'namenode-cluster.joined', 'zookeeper.formatted', 'start.namenode')
 def post_zookeeper_setup(cluster, zookeeper):
     hadoop = get_hadoop_base()
     hdfs = HDFS(hadoop)
