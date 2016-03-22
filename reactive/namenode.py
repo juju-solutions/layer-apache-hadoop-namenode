@@ -92,7 +92,7 @@ def send_info_ha(datanode, cluster):
         raise TimeoutError('Timed out waiting for other namenode')
         
     extended_status = unitdata.kv().get('extended.status')
-    position = unitdata.kv().get('position')
+    position = 'Leader' if hookenv.is_leader() else 'Follower'
     hookenv.status_set('active', 'Ready [{}] ({count} DataNode{s}) ({})'.format(
         position,
         extended_status,
@@ -141,12 +141,6 @@ def configure_cluster(cluster):
     cluster_nodes = cluster.nodes()
     cluster_keys = cluster.ssh_key()
     cluster.send_ssh_key(utils.get_ssh_key('hdfs'))
-    if hookenv.is_leader():
-        unitdata.kv().set('position', 'Leader')
-        unitdata.kv().flush(True)
-    else:
-        unitdata.kv().set('position', 'Follower')
-        unitdata.kv().flush(True)
     if data_changed('cluster.joined', cluster_nodes):
         hadoop = get_hadoop_base()
         hdfs = HDFS(hadoop)
