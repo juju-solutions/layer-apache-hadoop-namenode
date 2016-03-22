@@ -46,8 +46,6 @@ def check_ha_state(cluster):
     hdfs_port = hadoop.dist_config.port('namenode')
     if cluster.check_peer_port(hdfs_port):
         remove_state('hdfs.degraded')
-        unitdata.kv().set('extended.status', 'HA')
-        unitdata.kv().flush(True)
     else:
         unitdata.kv().set('extended.status', 'Degraded HA')
         unitdata.kv().flush(True)
@@ -255,7 +253,6 @@ def configure_zookeeper(cluster, zookeeper):
                 hdfs.start_zookeeper()
                 hookenv.status_set('active', 'Automatic Failover Enabled')
 
-
 @when('namenode.started', 'namenode-cluster.joined', 'journalnodes.initialized', 'zookeeper.formatted')
 @when_not('zookeeper.ready')
 def departed_zookeeper(cluster):
@@ -263,6 +260,8 @@ def departed_zookeeper(cluster):
     hdfs = HDFS(hadoop)
     hdfs.stop_zookeeper()
     remove_state('zookeeper.formatted')
+    unitdata.kv().set('extended.status', 'HA Degraded')
+    unitdata.kv().flush(True)
 
 @when('namenode.started', 'namenode-cluster.joined', 'zookeeper.formatted', 'start.namenode')
 def post_zookeeper_actions(cluster):
@@ -271,6 +270,8 @@ def post_zookeeper_actions(cluster):
     hdfs.start_namenode()
     if hookenv.is_leader():
         cluster.jns_init()
+        unitdata.kv().set('extended.status', 'HA')
+        unitdata.kv().flush(True)
     remove_state('start.namenode')
 
 
@@ -278,6 +279,8 @@ def post_zookeeper_actions(cluster):
 @when_not('hdfs.degraded')
 def dn_queue_restart(datanode, *args):
     datanode.queue_restart()
+    unitdata.kv().set('extended.status', 'HA')
+    unitdata.kv().flush(True)
     remove_state('dn.queue.restart')
 
 
