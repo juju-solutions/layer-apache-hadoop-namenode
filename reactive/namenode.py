@@ -267,7 +267,7 @@ def departed_zookeeper(cluster):
     remove_state('zookeeper.formatted')
 
 @when('namenode.started', 'namenode-cluster.joined', 'zookeeper.formatted', 'start.namenode')
-def post_zookeeper_setup(cluster, zookeeper):
+def post_zookeeper_setup(cluster):
     hadoop = get_hadoop_base()
     hdfs = HDFS(hadoop)
     hdfs.start_namenode()
