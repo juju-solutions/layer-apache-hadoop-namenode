@@ -183,20 +183,27 @@ def journalnodes_depart(*args):
 
 
 @when('namenode-cluster.joined', 'zookeeper.ready', 'namenode-cluster.configured', 'journalnodes.quorum')
-def initialize_ha(cluster, zookeeper, *args):
-    hadoop = get_hadoop_base()
-    hdfs = HDFS(hadoop)
+@when_not('namenode.shared-edits.init')
+def leader_initialize_journalnodes(cluster, zookeeper, *args):
     if hookenv.is_leader():
-        if not is_state('namenode.shared-edits.init'):
-            hdfs.stop_namenode()
-            hdfs.init_sharededits()
-            set_state('namenode.shared-edits.init')
-            remove_state('hdfs.degraded')
-            set_state('hdfs.ha.initialized')
-            set_state('start.namenode')
-            hookenv.status_set('waiting', 'Journalnode Shared Edits initialized, waiting for zookeeper')
-    elif not hookenv.is_leader():
-        if not is_state('namenode.standby.bootstrapped') and cluster.are_jns_init():
+        hadoop = get_hadoop_base()
+        hdfs = HDFS(hadoop)
+        hdfs.stop_namenode()
+        hdfs.init_sharededits()
+        set_state('namenode.shared-edits.init')
+        remove_state('hdfs.degraded')
+        set_state('hdfs.ha.initialized')
+        set_state('start.namenode')
+        hookenv.status_set('waiting', 'Journalnode Shared Edits initialized, waiting for zookeeper')
+
+
+@when('namenode-cluster.joined', 'namenode-cluster.configured', 'zookeeper.ready', 'journalnodes.quorum')
+@when_not('namenode.standby.bootstrapped')
+def nonleader_bootstrap_standby(cluster, zookeeper, *args):
+    if not hookenv.is_leader():
+        hadoop = get_hadoop_base()
+        hdfs = HDFS(hadoop)
+        if cluster.are_jns_init():
             utils.update_kv_hosts(cluster.hosts_map())
             utils.manage_etc_hosts()
             hdfs.stop_namenode()
@@ -219,7 +226,7 @@ def configure_zookeeper(cluster, zookeeper):
         hdfs.configure_zookeeper(zookeeper_nodes)
         if hookenv.is_leader():
             hdfs.format_zookeeper()
-            cluster.jns_init()
+            #cluster.jns_init()
             cluster.zookeeper_formatted()
             set_state('zookeeper.formatted')
             hdfs.start_zookeeper()
@@ -244,10 +251,12 @@ def departed_zookeeper(cluster):
     remove_state('zookeeper.formatted')
 
 @when('namenode.started', 'namenode.cluster-joined', 'zookeeper.formatted', 'start.namenode')
-def restart_namenode(cluster, zookeeper):
+def post_zookeeper_setup(cluster, zookeeper):
     hadoop = get_hadoop_base()
     hdfs = HDFS(hadoop)
     hdfs.start_namenode()
+    if hookenv.is_leader():
+       cluster.jns_init()
     remove_state('start.namenode')
 
 
