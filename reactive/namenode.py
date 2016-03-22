@@ -215,22 +215,24 @@ def configure_zookeeper(cluster, zookeeper):
     zookeeper_nodes = zookeeper.zookeepers()
     hadoop = get_hadoop_base()
     hdfs = HDFS(hadoop)
-    hdfs.configure_zookeeper(zookeeper_nodes)
-    if hookenv.is_leader():
-        if data_changed('zookeepers', zookeeper_nodes):
-            if hookenv.is_leader():
-                hdfs.format_zookeeper()
-                cluster.jns_init()
-                cluster.zookeeper_formatted()
-                set_state('zookeeper.formatted')
-                hdfs.start_zookeeper()
-                hookenv.status_set('active', 'Automatic Failover Enabled')
-    else:
-        if cluster.is_zookeeper_formatted():
-            set_state('dn.queue.restart')
+    if data_changed('zookeepers', zookeeper_nodes):
+        hdfs.configure_zookeeper(zookeeper_nodes)
+        if hookenv.is_leader():
+            hdfs.format_zookeeper()
+            cluster.jns_init()
+            cluster.zookeeper_formatted()
             set_state('zookeeper.formatted')
             hdfs.start_zookeeper()
             hookenv.status_set('active', 'Automatic Failover Enabled')
+        else:
+            while not cluster.is_zookeeper_formatted():
+                hookenv.status_set('blocked', 'Waiting for leader to format zookeeper')
+                time.sleep(10)
+            else:
+                set_state('dn.queue.restart')
+                set_state('zookeeper.formatted')
+                hdfs.start_zookeeper()
+                hookenv.status_set('active', 'Automatic Failover Enabled')
 
 
 @when('namenode.started', 'namenode-cluster.joined', 'hdfs.ha.initialized', 'zookeeper.formatted')
