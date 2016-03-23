@@ -233,25 +233,24 @@ def configure_zookeeper(cluster, zookeeper):
     zookeeper_nodes = zookeeper.zookeepers()
     hadoop = get_hadoop_base()
     hdfs = HDFS(hadoop)
-    if data_changed('zookeepers', zookeeper_nodes):
-        hdfs.configure_zookeeper(zookeeper_nodes)
-        if hookenv.is_leader():
-            hdfs.stop_namenode()
-            hdfs.format_zookeeper()
-            #cluster.jns_init()
-            cluster.zookeeper_formatted()
+    hdfs.configure_zookeeper(zookeeper_nodes)
+    if hookenv.is_leader():
+        hdfs.stop_namenode()
+        hdfs.format_zookeeper()
+        #cluster.jns_init()
+        cluster.zookeeper_formatted()
+        set_state('zookeeper.formatted')
+        hdfs.start_zookeeper()
+        hookenv.status_set('active', 'Automatic Failover Enabled')
+    else:
+        while not cluster.is_zookeeper_formatted():
+            hookenv.status_set('blocked', 'Waiting for leader to format zookeeper')
+            time.sleep(10)
+        else:
+            set_state('dn.queue.restart')
             set_state('zookeeper.formatted')
             hdfs.start_zookeeper()
             hookenv.status_set('active', 'Automatic Failover Enabled')
-        else:
-            while not cluster.is_zookeeper_formatted():
-                hookenv.status_set('blocked', 'Waiting for leader to format zookeeper')
-                time.sleep(10)
-            else:
-                set_state('dn.queue.restart')
-                set_state('zookeeper.formatted')
-                hdfs.start_zookeeper()
-                hookenv.status_set('active', 'Automatic Failover Enabled')
 
 @when('namenode.started', 'namenode-cluster.joined', 'journalnodes.initialized', 'zookeeper.formatted')
 @when_not('zookeeper.ready')
@@ -264,7 +263,7 @@ def departed_zookeeper(cluster):
     unitdata.kv().flush(True)
 
 @when('namenode.started', 'namenode-cluster.joined', 'zookeeper.formatted', 'start.namenode')
-def post_zookeeper_actions(cluster):
+def finalize_ha_setup(cluster):
     hadoop = get_hadoop_base()
     hdfs = HDFS(hadoop)
     hdfs.start_namenode()
@@ -277,7 +276,7 @@ def post_zookeeper_actions(cluster):
 
 @when('datanode.journalnode.joined', 'dn.queue.restart', 'namenode.standby.bootstrapped')
 @when_not('hdfs.degraded')
-def dn_queue_restart(datanode, *args):
+def queue_datanode_restart(datanode, *args):
     datanode.queue_restart()
     unitdata.kv().set('extended.status', 'HA')
     unitdata.kv().flush(True)
@@ -318,6 +317,7 @@ def unregister_datanode(datanode):
 
     slaves_remaining = list(set(slaves) - set(slaves_leaving))
     unitdata.kv().set('namenode.slaves', slaves_remaining)
+    # need to handle HA here (i.e. register slaves won't work if a namenode is down)
     hdfs.register_slaves(slaves_remaining)
 
     utils.remove_kv_hosts(slaves_leaving)
