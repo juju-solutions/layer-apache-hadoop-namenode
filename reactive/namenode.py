@@ -228,22 +228,12 @@ def nonleader_bootstrap_standby(cluster, zookeeper, *args):
 
 
 @when('namenode.started', 'namenode-cluster.joined', 'zookeeper.ready', 'journalnodes.initialized')
-def configure_zookeeper(cluster, zookeeper):
-    zookeeper_nodes = zookeeper.zookeepers()
-    hadoop = get_hadoop_base()
-    hdfs = HDFS(hadoop)
-    if data_changed('zookeeper.nodes'. zookeeper_nodes):
-        hdfs.configure_zookeeper(zookeeper_nodes)
-        hdfs.restart_zookeeper()
-        set_state('zookeeper.configured')
-
-
-@when('namenode.started', 'namenode-cluster.joined', 'zookeeper.ready', 'journalnodes.initialized', 'zookeeper.configured')
 @when_not('zookeeper.formatted')
 def format_zookeeper(cluster, zookeeper):
     zookeeper_nodes = zookeeper.zookeepers()
     hadoop = get_hadoop_base()
     hdfs = HDFS(hadoop)
+    hdfs.configure_zookeeper(zookeeper_nodes)
     if hookenv.is_leader():
         hdfs.stop_namenode()
         hdfs.format_zookeeper()
@@ -260,6 +250,18 @@ def format_zookeeper(cluster, zookeeper):
             set_state('zookeeper.formatted')
             hdfs.start_zookeeper()
             hookenv.status_set('active', 'Automatic Failover Enabled')
+
+
+@when('namenode.started', 'namenode-cluster.joined', 'zookeeper.ready', 'journalnodes.initialized', 'zookeeper.formatted')
+def reconfigure_zookeeper(cluster, zookeeper):
+    zookeeper_nodes = zookeeper.zookeepers()
+    hadoop = get_hadoop_base()
+    hdfs = HDFS(hadoop)
+    if data_changed('zookeeper.nodes'. zookeeper_nodes):
+        hdfs.configure_zookeeper(zookeeper_nodes)
+        hdfs.restart_zookeeper()
+        set_state('zookeeper.configured')
+
 
 @when('namenode.started', 'namenode-cluster.joined', 'journalnodes.initialized', 'zookeeper.formatted')
 @when_not('zookeeper.ready')
