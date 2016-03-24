@@ -257,7 +257,7 @@ def reconfigure_zookeeper(cluster, zookeeper):
     zookeeper_nodes = zookeeper.zookeepers()
     hadoop = get_hadoop_base()
     hdfs = HDFS(hadoop)
-    if data_changed('zookeeper.nodes'. zookeeper_nodes):
+    if data_changed('zookeeper.nodes', zookeeper_nodes):
         hdfs.configure_zookeeper(zookeeper_nodes)
         hdfs.restart_zookeeper()
         set_state('zookeeper.configured')
