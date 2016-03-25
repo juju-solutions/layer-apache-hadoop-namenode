@@ -335,6 +335,42 @@ def unregister_datanode(datanode):
     unitdata.kv().set('namenode.slaves', slaves_remaining)
     # need to handle HA here (i.e. register slaves won't work if a namenode is down)
     hdfs.register_slaves(slaves_remaining)
+    hdfs.reload_slaves()
+
+    utils.remove_kv_hosts(slaves_leaving)
+    utils.manage_etc_hosts()
+
+    if not slaves_remaining:
+        hookenv.status_set('blocked', 'Waiting for relation to DataNodes')
+        remove_state('namenode.ready')
+
+    datanode.dismiss()
+
+
+@when('namenode.started', 'datanode.departing', 'namenode-cluster.initialized')
+@when_not('hdfs.degraded')
+def unregister_datanode_ha(datanode, cluster):
+    hadoop = get_hadoop_base()
+    hdfs = HDFS(hadoop)
+
+    slaves = unitdata.kv().get('namenode.slaves', [])
+    slaves_leaving = datanode.nodes()  # only returns nodes in "leaving" state
+    hookenv.log('Slaves leaving: {}'.format(slaves_leaving))
+
+    slaves_remaining = list(set(slaves) - set(slaves_leaving))
+    unitdata.kv().set('namenode.slaves', slaves_remaining)
+    # need to handle HA here (i.e. register slaves won't work if a namenode is down)
+    while time.time() - start < 120:
+        if cluster.check_peer_port(hdfs_port):
+            unitdata.kv().set('namenode.slaves', slaves)
+            hdfs.register_slaves(slaves_remaining))
+            hdfs.reload_slaves()
+            return True
+        else:
+            hookenv.status_set('waiting', 'HDFS HA degraded - waiting for peer...')
+            set_state('hdfs.degraded')
+        time.sleep(2)
+    raise TimeoutError('Timed out waiting for other namenode')
 
     utils.remove_kv_hosts(slaves_leaving)
     utils.manage_etc_hosts()
