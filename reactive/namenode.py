@@ -4,7 +4,7 @@ from charms.reactive import when_not
 from charms.reactive import set_state
 from charms.reactive import remove_state
 from charms.reactive.helpers import data_changed
-from charms.layer.hadoop_base import get_hadoop_base
+from charms.layer.hadoop_base import get_hadoop_base charm_config
 from jujubigdata.handlers import HDFS
 from jujubigdata import utils
 from charmhelpers.core import hookenv, unitdata
@@ -175,7 +175,8 @@ def configure_journalnodes(cluster, datanode):
 
 @when('namenode.started', 'namenode-cluster.joined', 'datanode.journalnode.joined', 'journalnode.registered')
 def journalnode_quorum(cluster, datanode):
-    if datanode.journalnodes_quorum():
+    config = hookenv.config()
+    if datanode.journalnodes_quorum(config['journalnode_quorum_size']):
         set_state('journalnodes.quorum')
     else:
         remove_state('journalnodes.quorum')
