@@ -1,10 +1,9 @@
-import time
 from charms.reactive import when
 from charms.reactive import when_not
 from charms.reactive import set_state
 from charms.reactive import remove_state
 from charms.reactive.helpers import data_changed
-from charms.layer.hadoop_base import get_hadoop_base charm_config
+from charms.layer.hadoop_base import get_hadoop_base
 from jujubigdata.handlers import HDFS
 from jujubigdata import utils
 from charmhelpers.core import hookenv, unitdata
@@ -58,7 +57,7 @@ def send_info(datanode):
         unitdata.kv().set('namenode.slaves', slaves)
         hdfs.register_slaves(slaves)
         hdfs.reload_slaves()
-    
+
     extended_status = unitdata.kv().get('extended.status')
     hookenv.status_set('active', 'Ready ({count} DataNode{s}) ({})'.format(
         extended_status,
