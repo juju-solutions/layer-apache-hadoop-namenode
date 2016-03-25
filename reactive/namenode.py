@@ -2,9 +2,7 @@ import time
 from charms.reactive import when
 from charms.reactive import when_not
 from charms.reactive import set_state
-from charms.reactive.bus import get_state
 from charms.reactive import remove_state
-from charms.reactive import is_state
 from charms.reactive.helpers import data_changed
 from charms.layer.hadoop_base import get_hadoop_base
 from jujubigdata.handlers import HDFS
@@ -40,11 +38,13 @@ class TimeoutError(Exception):
     pass
 
 
-@when('namenode.started', 'namenode-cluster.initialized')
-def check_ha_state(cluster):
+@when('namenode.started', 'namenode-cluster.initialized', 'zookeeper.ready', 'journalnodes.initialized')
+def check_ha_state(cluster, *args):
     hadoop = get_hadoop_base()
     hdfs_port = hadoop.dist_config.port('namenode')
     if cluster.check_peer_port(hdfs_port):
+        unitdata.kv().set('extended.status', 'HA')
+        unitdata.kv().flush(True)
         remove_state('hdfs.degraded')
     else:
         unitdata.kv().set('extended.status', 'Degraded HA')
@@ -257,6 +257,8 @@ def reconfigure_zookeeper(cluster, zookeeper):
     zookeeper_nodes = zookeeper.zookeepers()
     hadoop = get_hadoop_base()
     hdfs = HDFS(hadoop)
+    unitdata.kv().set('extended.status', 'HA')
+    unitdata.kv().flush(True)
     if data_changed('zookeeper.nodes', zookeeper_nodes):
         hdfs.configure_zookeeper(zookeeper_nodes)
         hdfs.restart_zookeeper()
@@ -271,7 +273,7 @@ def departed_zookeeper(cluster):
     hdfs.stop_zookeeper()
     remove_state('zookeeper.formatted')
     remove_state('zookeeper.configured')
-    unitdata.kv().set('extended.status', 'HA Degraded')
+    unitdata.kv().set('extended.status', 'HA degraded, zookeeper gone away')
     unitdata.kv().flush(True)
 
 
