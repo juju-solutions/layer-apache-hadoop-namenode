@@ -323,6 +323,7 @@ def reject_clients(clients):
 
 
 @when('namenode.started', 'datanode.departing')
+@when_not('namenode-cluster.initialized')
 def unregister_datanode(datanode):
     hadoop = get_hadoop_base()
     hdfs = HDFS(hadoop)
