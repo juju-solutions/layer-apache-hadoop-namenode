@@ -300,6 +300,7 @@ def accept_clients_ha(clients):
 def unregister_datanode_ha(datanode, cluster):
     hadoop = get_hadoop_base()
     hdfs = HDFS(hadoop)
+    hdfs_port = hadoop.dist_config.port('namenode')
 
     slaves = unitdata.kv().get('namenode.slaves', [])
     slaves_leaving = datanode.nodes()  # only returns nodes in "leaving" state
@@ -308,10 +309,11 @@ def unregister_datanode_ha(datanode, cluster):
     slaves_remaining = list(set(slaves) - set(slaves_leaving))
     unitdata.kv().set('namenode.slaves', slaves_remaining)
     # need to handle HA here (i.e. register slaves won't work if a namenode is down)
+    start = time.time()
     while time.time() - start < 120:
         if cluster.check_peer_port(hdfs_port):
             unitdata.kv().set('namenode.slaves', slaves)
-            hdfs.register_slaves(slaves_remaining))
+            hdfs.register_slaves(slaves_remaining)
             hdfs.reload_slaves()
             return True
         else:
