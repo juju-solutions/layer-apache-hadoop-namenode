@@ -1,5 +1,11 @@
 #!/bin/bash
 set -ex
+
+if ! charms.reactive is_state 'namenode.ready'; then
+    action-fail 'NameNode not yet ready'
+    exit
+fi
+
 BASE_DIR=`action-get basedir`/`hostname -s`
 OPTIONS=''
 
