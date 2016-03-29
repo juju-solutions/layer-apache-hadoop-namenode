@@ -91,7 +91,7 @@ Once they all indicate that they are ready, you can perform a "smoke test"
 to verify that HDFS is working as expected using the built-in `smoke-test`
 action:
 
-    juju action do smoke-test
+    juju action do namenode/0 smoke-test
 
 After a few seconds or so, you can check the results of the smoke test:
 
