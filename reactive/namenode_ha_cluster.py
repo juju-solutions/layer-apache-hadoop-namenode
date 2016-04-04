@@ -70,40 +70,6 @@ def send_info_ha(datanode, cluster):
     set_state('namenode.ready')
 
 
-@when('namenode.started', 'datanode.joined')
-@when_not('namenode-cluster.initialized')
-def send_info(datanode):
-    hadoop = get_hadoop_base()
-    hdfs = HDFS(hadoop)
-    local_hostname = hookenv.local_unit().replace('/', '-')
-    hdfs_port = hadoop.dist_config.port('namenode')
-    webhdfs_port = hadoop.dist_config.port('nn_webapp_http')
-
-    utils.update_kv_hosts(datanode.hosts_map())
-    utils.manage_etc_hosts()
-
-    datanode.send_spec(hadoop.spec())
-    datanode.send_clustername(hookenv.service_name())
-    datanode.send_namenodes([local_hostname])
-    datanode.send_ports(hdfs_port, webhdfs_port)
-    datanode.send_ssh_key(utils.get_ssh_key('hdfs'))
-    datanode.send_hosts_map(utils.get_kv_hosts())
-
-    slaves = datanode.nodes()
-    if data_changed('namenode.slaves', slaves):
-        unitdata.kv().set('namenode.slaves', slaves)
-        hdfs.register_slaves(slaves)
-        hdfs.reload_slaves()
-
-    extended_status = unitdata.kv().get('extended.status')
-    hookenv.status_set('active', 'Ready ({count} DataNode{s}) ({})'.format(
-        extended_status,
-        count=len(slaves),
-        s='s' if len(slaves) > 1 else '',
-    ))
-    set_state('namenode.ready')
-
-
 @when('namenode.started', 'namenode-cluster.joined')
 def configure_cluster(cluster):
     cluster_nodes = cluster.nodes()
