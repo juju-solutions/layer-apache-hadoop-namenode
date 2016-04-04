@@ -27,10 +27,18 @@ def configure_namenode():
     unitdata.kv().set('extended.status', 'stand-alone')
     unitdata.kv().flush(True)
 
+
 @when('namenode.started')
 @when_not('datanode.joined')
 def blocked():
     hookenv.status_set('blocked', 'Waiting for relation to DataNodes')
+
+
+@when('datanode.joined')
+def manage_datanode_hosts(datanode):
+    utils.update_kv_hosts(datanode.hosts_map())
+    utils.manage_etc_hosts()
+    datanode.send_hosts_map(utils.get_kv_hosts())
 
 
 @when('namenode.started', 'datanode.joined')
@@ -42,15 +50,11 @@ def send_info(datanode):
     hdfs_port = hadoop.dist_config.port('namenode')
     webhdfs_port = hadoop.dist_config.port('nn_webapp_http')
 
-    utils.update_kv_hosts(datanode.hosts_map())
-    utils.manage_etc_hosts()
-
     datanode.send_spec(hadoop.spec())
     datanode.send_clustername(hookenv.service_name())
     datanode.send_namenodes([local_hostname])
     datanode.send_ports(hdfs_port, webhdfs_port)
     datanode.send_ssh_key(utils.get_ssh_key('hdfs'))
-    datanode.send_hosts_map(utils.get_kv_hosts())
 
     slaves = datanode.nodes()
     if data_changed('namenode.slaves', slaves):

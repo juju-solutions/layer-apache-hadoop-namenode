@@ -25,7 +25,7 @@ def check_ha_state(cluster, *args):
     else:
         unitdata.kv().set('extended.status', 'Degraded HA')
         unitdata.kv().flush(True)
- 
+
 
 @when('namenode.started', 'datanode.joined', 'namenode-cluster.initialized')
 @when_not('hdfs.degraded')
@@ -36,15 +36,11 @@ def send_info_ha(datanode, cluster):
     hdfs_port = hadoop.dist_config.port('namenode')
     webhdfs_port = hadoop.dist_config.port('nn_webapp_http')
 
-    utils.update_kv_hosts(datanode.hosts_map())
-    utils.manage_etc_hosts()
-
     datanode.send_spec(hadoop.spec())
     datanode.send_clustername(hookenv.service_name())
     datanode.send_namenodes(cluster_nodes)
     datanode.send_ports(hdfs_port, webhdfs_port)
     datanode.send_ssh_key(utils.get_ssh_key('hdfs'))
-    datanode.send_hosts_map(utils.get_kv_hosts())
 
     slaves = datanode.nodes()
 
@@ -62,7 +58,7 @@ def send_info_ha(datanode, cluster):
                 set_state('hdfs.degraded')
             time.sleep(2)
         raise TimeoutError('Timed out waiting for other namenode')
-        
+
     extended_status = unitdata.kv().get('extended.status')
     position = 'Leader' if hookenv.is_leader() else 'Follower'
     hookenv.status_set('active', 'Ready [{}] ({count} DataNode{s}) ({})'.format(
@@ -98,7 +94,7 @@ def send_info(datanode):
         unitdata.kv().set('namenode.slaves', slaves)
         hdfs.register_slaves(slaves)
         hdfs.reload_slaves()
-    
+
     extended_status = unitdata.kv().get('extended.status')
     hookenv.status_set('active', 'Ready ({count} DataNode{s}) ({})'.format(
         extended_status,
@@ -276,7 +272,7 @@ def queue_datanode_restart(datanode, *args):
 '''
 The following block and method will probably need to be modified
 to send clustered namenodes etc, as the current accept_clients
-block and method does - the states will need to be changed as 
+block and method does - the states will need to be changed as
 currently it does not fire
 '''
 @when('namenode.ready', 'namenode.clients', 'namenode-cluster.initialized', 'non.existent.blocking.state')
