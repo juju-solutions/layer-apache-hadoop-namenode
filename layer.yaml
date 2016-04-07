@@ -2,6 +2,7 @@ repo: git@github.com:juju-solutions/layer-apache-hadoop-namenode.git
 includes:
   - 'layer:hadoop-base'
   - 'layer:hadoop-ganglia'
+  - 'layer:leadership'
   - 'interface:namenode-cluster'
   - 'interface:dfs'
   - 'interface:dfs-slave'

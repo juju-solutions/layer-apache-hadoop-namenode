@@ -7,6 +7,7 @@ from charms.layer.hadoop_base import get_hadoop_base
 from jujubigdata.handlers import HDFS
 from jujubigdata import utils
 from charmhelpers.core import hookenv, unitdata
+from charms import leadership
 
 
 @when('hadoop.installed')
@@ -28,6 +29,24 @@ def configure_namenode():
     unitdata.kv().flush(True)
 
 
+@when('hadoop.installed', 'leadership.is_leader')
+@when_not('leadership.set.ssh-key-pub')
+def generate_ssh_key():
+    utils.generate_ssh_key('hdfs')
+    leadership.leader_set({
+        'ssh-key-priv': utils.ssh_priv_key('hdfs').text(),
+        'ssh-key-pub': utils.ssh_pub_key('hdfs').text(),
+    })
+
+
+@when('leadership.changed.ssh-key-pub')
+def install_ssh_key():
+    ssh_dir = utils.ssh_key_dir('hdfs')
+    ssh_dir.makedirs_p()
+    authfile = ssh_dir / 'authorized_keys'
+    authfile.write_lines(leadership.leader_get('ssh-key-pub'), append=True)
+
+
 @when('namenode.started')
 @when_not('datanode.joined')
 def blocked():
@@ -39,6 +58,11 @@ def manage_datanode_hosts(datanode):
     utils.update_kv_hosts(datanode.hosts_map())
     utils.manage_etc_hosts()
     datanode.send_hosts_map(utils.get_kv_hosts())
+
+
+@when('datanode.joined', 'leadership.set.ssh-key-pub')
+def send_ssh_key(datanode):
+    datanode.send_ssh_key(leadership.leader_get('ssh-key-pub'))
 
 
 @when('namenode.started', 'datanode.joined')
@@ -54,7 +78,6 @@ def send_info(datanode):
     datanode.send_clustername(hookenv.service_name())
     datanode.send_namenodes([local_hostname])
     datanode.send_ports(hdfs_port, webhdfs_port)
-    datanode.send_ssh_key(utils.get_ssh_key('hdfs'))
 
     slaves = datanode.nodes()
     if data_changed('namenode.slaves', slaves):

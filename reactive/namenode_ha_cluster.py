@@ -40,7 +40,6 @@ def send_info_ha(datanode, cluster):
     datanode.send_clustername(hookenv.service_name())
     datanode.send_namenodes(cluster_nodes)
     datanode.send_ports(hdfs_port, webhdfs_port)
-    datanode.send_ssh_key(utils.get_ssh_key('hdfs'))
 
     slaves = datanode.nodes()
 
@@ -73,8 +72,6 @@ def send_info_ha(datanode, cluster):
 @when('namenode.started', 'namenode-cluster.joined')
 def configure_cluster(cluster):
     cluster_nodes = cluster.nodes()
-    cluster_keys = cluster.ssh_key()
-    cluster.send_ssh_key(utils.get_ssh_key('hdfs'))
     if data_changed('cluster.joined', cluster_nodes):
         hadoop = get_hadoop_base()
         hdfs = HDFS(hadoop)
@@ -83,10 +80,7 @@ def configure_cluster(cluster):
         hdfs.configure_namenode(cluster_nodes)
         unitdata.kv().set('extended.status', 'clustered')
         unitdata.kv().flush(True)
-    if cluster_keys:
-        if data_changed('cluster.keys', cluster_keys):
-            utils.install_ssh_key('hdfs', cluster.ssh_key())
-            set_state('namenode-cluster.configured')
+        set_state('namenode-cluster.configured')
 
 
 @when('namenode.started', 'namenode-cluster.initialized')
@@ -130,38 +124,38 @@ def journalnodes_depart(*args):
     remove_state('journalnodes.quorum')
 
 
+@when('leadership.is_leader')
 @when('namenode-cluster.joined', 'zookeeper.ready', 'namenode-cluster.configured', 'journalnodes.quorum')
 @when_not('namenode.shared-edits.init')
 def leader_initialize_journalnodes(cluster, zookeeper, *args):
-    if hookenv.is_leader():
-        hadoop = get_hadoop_base()
-        hdfs = HDFS(hadoop)
-        hdfs.stop_namenode()
-        hdfs.init_sharededits()
-        set_state('namenode.shared-edits.init')
-        remove_state('hdfs.degraded')
-        set_state('journalnodes.initialized')
-        set_state('start.namenode')
-        hookenv.status_set('waiting', 'Journalnode Shared Edits initialized, waiting for zookeeper')
+    hadoop = get_hadoop_base()
+    hdfs = HDFS(hadoop)
+    hdfs.stop_namenode()
+    hdfs.init_sharededits()
+    set_state('namenode.shared-edits.init')
+    remove_state('hdfs.degraded')
+    set_state('journalnodes.initialized')
+    set_state('start.namenode')
+    hookenv.status_set('waiting', 'Journalnode Shared Edits initialized, waiting for zookeeper')
 
 
+@when_not('leadership.is_leader')
 @when('namenode-cluster.joined', 'namenode-cluster.configured', 'zookeeper.ready', 'journalnodes.quorum')
 @when_not('namenode.standby.bootstrapped')
 def nonleader_bootstrap_standby(cluster, zookeeper, *args):
-    if not hookenv.is_leader():
-        hadoop = get_hadoop_base()
-        hdfs = HDFS(hadoop)
-        if cluster.are_jns_init():
-            utils.update_kv_hosts(cluster.hosts_map())
-            utils.manage_etc_hosts()
-            hdfs.stop_namenode()
-            hdfs.format_namenode()
-            hdfs.bootstrap_standby()
-            set_state('namenode.standby.bootstrapped')
-            remove_state('hdfs.degraded')
-            set_state('journalnodes.initialized')
-            set_state('start.namenode')
-            hookenv.status_set('waiting', 'Waiting for leader to enable Automatic Failover')
+    hadoop = get_hadoop_base()
+    hdfs = HDFS(hadoop)
+    if cluster.are_jns_init():
+        utils.update_kv_hosts(cluster.hosts_map())
+        utils.manage_etc_hosts()
+        hdfs.stop_namenode()
+        hdfs.format_namenode()
+        hdfs.bootstrap_standby()
+        set_state('namenode.standby.bootstrapped')
+        remove_state('hdfs.degraded')
+        set_state('journalnodes.initialized')
+        set_state('start.namenode')
+        hookenv.status_set('waiting', 'Waiting for leader to enable Automatic Failover')
 
 
 @when('namenode.started', 'namenode-cluster.joined', 'zookeeper.ready', 'journalnodes.initialized')
