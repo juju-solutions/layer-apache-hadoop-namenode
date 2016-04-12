@@ -1,288 +1,175 @@
-import time
+from operator import itemgetter
 from charms.reactive import when
 from charms.reactive import when_not
+from charms.reactive import is_state
 from charms.reactive import set_state
 from charms.reactive import remove_state
+from charms.reactive import toggle_state
 from charms.reactive.helpers import data_changed
 from charms.layer.hadoop_base import get_hadoop_base
 from jujubigdata.handlers import HDFS
 from jujubigdata import utils
-from charmhelpers.core import hookenv, unitdata
+from charmhelpers.core import hookenv
+from charms import leadership
+from charms.layer.apache_hadoop_namenode import get_cluster_nodes
+from charms.layer.apache_hadoop_namenode import set_cluster_nodes
 
 
-class TimeoutError(Exception):
-    pass
+@when('namenode-cluster.joined')
+def manage_cluster_hosts(cluster):
+    utils.update_kv_hosts(cluster.hosts_map())
+    utils.manage_etc_hosts()
 
 
-@when('namenode.started', 'namenode-cluster.initialized', 'zookeeper.ready', 'journalnodes.initialized')
-def check_ha_state(cluster, *args):
+@when('namenode-cluster.joined')
+@when_not('leadership.is_leader')
+def check_cluster_nodes(cluster):
     hadoop = get_hadoop_base()
     hdfs_port = hadoop.dist_config.port('namenode')
-    if cluster.check_peer_port(hdfs_port):
-        unitdata.kv().set('extended.status', 'HA')
-        unitdata.kv().flush(True)
-        remove_state('hdfs.degraded')
+
+    manage_cluster_hosts(cluster)  # ensure /etc/hosts is up-to-date
+
+    chosen_nodes = get_cluster_nodes()
+    extra_nodes = sorted(set(cluster.nodes()) - set(chosen_nodes))
+
+    if is_state('namenode.ha.initialized'):
+        # filter down to only responding nodes, preferring
+        # nodes we've already chosen over new nodes
+        viable_nodes = [node for node in chosen_nodes + extra_nodes
+                        if utils.check_connect(node, hdfs_port)]
     else:
-        unitdata.kv().set('extended.status', 'Degraded HA')
-        unitdata.kv().flush(True)
+        # if HA is not yet initialized, then the other node won't
+        # yet be running, so just assume all nodes are viable
+        viable_nodes = chosen_nodes + extra_nodes
+
+    cluster_viable = len(viable_nodes) >= 2
+    hookenv.log('Viable nodes: {}'.format(viable_nodes))
+    toggle_state('namenode.clustered', cluster_viable)
+    return viable_nodes
 
 
-@when('namenode.started', 'datanode.joined', 'namenode-cluster.initialized')
-@when_not('hdfs.degraded')
-def send_info_ha(datanode, cluster):
+@when('namenode-cluster.joined')
+@when('leadership.is_leader')
+def choose_cluster_nodes(cluster):
+    viable_nodes = check_cluster_nodes(cluster)
+    cluster_viable = len(viable_nodes) >= 2
+    if cluster_viable:
+        # only update chosen nodes if we (again) have enough viable nodes
+        set_cluster_nodes(viable_nodes[:2])
+
+
+@when('datanode.journalnode.joined')
+def check_journalnode_quorum(datanode):
+    nodes = datanode.nodes()
+    quorum_size = hookenv.config('journalnode_quorum_size')
+    toggle_state('journalnode.quorum', len(nodes) >= quorum_size)
+
+
+@when_not('datanode.journalnode.joined')
+def remove_journalnode_quorum():
+    remove_state('journalnode.quorum')
+
+
+@when('namenode.clustered', 'journalnode.quorum')
+def enable_ha():
+    set_state('namenode.ha')  # once HA, always HA
+
+
+@when('namenode.ha', 'datanode.joined')
+def update_ha_config(datanode):
+    cluster_nodes = get_cluster_nodes()
+    jn_nodes = sorted(datanode.nodes())
+    jn_port = datanode.jn_port()
+    started = is_state('namenode.started')
+    ha_inited = is_state('namenode.ha.initialized')
+    new_cluster_config = data_changed('namenode.cluster-nodes', cluster_nodes)
+    new_jn_config = data_changed('namenode.jn.config', (jn_nodes, jn_port))
+
     hadoop = get_hadoop_base()
     hdfs = HDFS(hadoop)
-    cluster_nodes = cluster.nodes()
-    hdfs_port = hadoop.dist_config.port('namenode')
-    webhdfs_port = hadoop.dist_config.port('nn_webapp_http')
+    hdfs.configure_namenode(cluster_nodes)
+    hdfs.register_journalnodes(jn_nodes, jn_port)
 
-    datanode.send_spec(hadoop.spec())
-    datanode.send_clustername(hookenv.service_name())
-    datanode.send_namenodes(cluster_nodes)
-    datanode.send_ports(hdfs_port, webhdfs_port)
-
-    slaves = datanode.nodes()
-
-    if data_changed('namenode.slaves', slaves):
-        hookenv.log("Waiting for other namenode...")
-        start = time.time()
-        while time.time() - start < 120:
-            if cluster.check_peer_port(hdfs_port):
-                unitdata.kv().set('namenode.slaves', slaves)
-                hdfs.register_slaves(slaves)
-                hdfs.reload_slaves()
-                return True
-            else:
-                hookenv.status_set('waiting', 'HDFS HA degraded - waiting for peer...')
-                set_state('hdfs.degraded')
-            time.sleep(2)
-        raise TimeoutError('Timed out waiting for other namenode')
-
-    extended_status = unitdata.kv().get('extended.status')
-    position = 'Leader' if hookenv.is_leader() else 'Follower'
-    hookenv.status_set('active', 'Ready [{}] ({count} DataNode{s}) ({})'.format(
-        position,
-        extended_status,
-        count=len(slaves),
-        s='s' if len(slaves) > 1 else '',
-    ))
-    set_state('namenode.ready')
+    if started and ha_inited and new_cluster_config:
+        hdfs.restart_namenode()
+    elif started and ha_inited and new_jn_config:
+        hdfs.reload_slaves()
 
 
-@when('namenode.started', 'namenode-cluster.joined')
-def configure_cluster(cluster):
-    cluster_nodes = cluster.nodes()
-    if data_changed('cluster.joined', cluster_nodes):
-        hadoop = get_hadoop_base()
-        hdfs = HDFS(hadoop)
-        utils.update_kv_hosts(cluster.hosts_map())
-        utils.manage_etc_hosts()
-        hdfs.configure_namenode(cluster_nodes)
-        unitdata.kv().set('extended.status', 'clustered')
-        unitdata.kv().flush(True)
-        set_state('namenode-cluster.configured')
-
-
-@when('namenode.started', 'namenode-cluster.initialized')
-@when_not('namenode-cluster.joined')
-def cluster_degraded(*args):
-    set_state('hdfs.degraded')
-    remove_state('namenode-cluster.configured')
-
-
-@when('namenode.started', 'namenode-cluster.joined', 'datanode.journalnode.joined')
-def configure_journalnodes(cluster, datanode):
-    jn_nodes = datanode.nodes()
-    jn_port = datanode.jn_port()
-    if data_changed('journalnodes', [jn_nodes, jn_port]):
-        utils.update_kv_hosts(cluster.hosts_map())
-        utils.manage_etc_hosts()
-        hadoop = get_hadoop_base()
-        hdfs = HDFS(hadoop)
-        hdfs.register_journalnodes(jn_nodes, jn_port)
-        set_state('journalnode.registered')
-
-
-@when('namenode.started', 'namenode-cluster.joined', 'datanode.journalnode.joined', 'journalnode.registered')
-def journalnode_quorum(cluster, datanode):
-    config = hookenv.config()
-    if datanode.journalnodes_quorum(config['journalnode_quorum_size']):
-        set_state('journalnodes.quorum')
-    else:
-        remove_state('journalnodes.quorum')
-
-
-@when('namenode.started', 'namenode.shared-edits.init')
-@when_not('journalnodes.quorum')
-def journalnodes_quorum_degraded(*args):
-    remove_state('namenode.shared-edits.init')
-
-
-@when('namenode.started', 'namenode-cluster.joined')
-@when_not('datanode.journalnode.joined')
-def journalnodes_depart(*args):
-    remove_state('journalnodes.quorum')
-
-
+@when('namenode.ha', 'datanode.joined')
+@when_not('leadership.set.ha-initialized')
 @when('leadership.is_leader')
-@when('namenode-cluster.joined', 'zookeeper.ready', 'namenode-cluster.configured', 'journalnodes.quorum')
-@when_not('namenode.shared-edits.init')
-def leader_initialize_journalnodes(cluster, zookeeper, *args):
+def init_ha_active(datanode):
+    local_hostname = hookenv.local_unit().replace('/', '-')
+    update_ha_config(datanode)  # ensure the config is written
     hadoop = get_hadoop_base()
     hdfs = HDFS(hadoop)
     hdfs.stop_namenode()
+    remove_state('namenode.started')
+    update_ha_config(datanode)
     hdfs.init_sharededits()
-    set_state('namenode.shared-edits.init')
-    remove_state('hdfs.degraded')
-    set_state('journalnodes.initialized')
-    set_state('start.namenode')
-    hookenv.status_set('waiting', 'Journalnode Shared Edits initialized, waiting for zookeeper')
+    hdfs.start_namenode()
+    hdfs.transition_to_active(local_hostname)
+    leadership.leader_set({'ha-initialized': 'true'})
+    set_state('namenode.ha.initialized')
+    set_state('namenode.started')
 
 
+@when('namenode.ha', 'datanode.joined')
+@when('leadership.set.ha-initialized')
 @when_not('leadership.is_leader')
-@when('namenode-cluster.joined', 'namenode-cluster.configured', 'zookeeper.ready', 'journalnodes.quorum')
-@when_not('namenode.standby.bootstrapped')
-def nonleader_bootstrap_standby(cluster, zookeeper, *args):
+@when_not('namenode.ha.initialized')
+def init_ha_standby(datanode):
+    update_ha_config(datanode)  # ensure the config is written
     hadoop = get_hadoop_base()
     hdfs = HDFS(hadoop)
-    if cluster.are_jns_init():
-        utils.update_kv_hosts(cluster.hosts_map())
-        utils.manage_etc_hosts()
-        hdfs.stop_namenode()
-        hdfs.format_namenode()
-        hdfs.bootstrap_standby()
-        set_state('namenode.standby.bootstrapped')
-        remove_state('hdfs.degraded')
-        set_state('journalnodes.initialized')
-        set_state('start.namenode')
-        hookenv.status_set('waiting', 'Waiting for leader to enable Automatic Failover')
+    hdfs.stop_namenode()
+    remove_state('namenode.started')
+    update_ha_config(datanode)
+    hdfs.bootstrap_standby()
+    hdfs.start_namenode()
+    set_state('namenode.ha.initialized')
+    set_state('namenode.started')
 
 
-@when('namenode.started', 'namenode-cluster.joined', 'zookeeper.ready', 'journalnodes.initialized')
-@when_not('zookeeper.formatted')
-def format_zookeeper(cluster, zookeeper):
-    zookeeper_nodes = zookeeper.zookeepers()
+@when('zookeeper.ready')
+@when('namenode.ha.initialized')
+def update_zk_config(zookeeper):
     hadoop = get_hadoop_base()
     hdfs = HDFS(hadoop)
-    hdfs.configure_zookeeper(zookeeper_nodes)
-    if hookenv.is_leader():
-        hdfs.stop_namenode()
-        hdfs.format_zookeeper()
-        cluster.zookeeper_formatted()
-        set_state('zookeeper.formatted')
-        hdfs.start_zookeeper()
-        hookenv.status_set('active', 'Automatic Failover Enabled')
-    else:
-        while not cluster.is_zookeeper_formatted():
-            hookenv.status_set('blocked', 'Waiting for leader to format zookeeper')
-            time.sleep(10)
-        else:
-            set_state('dn.queue.restart')
-            set_state('zookeeper.formatted')
-            hdfs.start_zookeeper()
-            hookenv.status_set('active', 'Automatic Failover Enabled')
-
-
-@when('namenode.started', 'namenode-cluster.joined', 'zookeeper.ready', 'journalnodes.initialized', 'zookeeper.formatted')
-def reconfigure_zookeeper(cluster, zookeeper):
-    zookeeper_nodes = zookeeper.zookeepers()
-    hadoop = get_hadoop_base()
-    hdfs = HDFS(hadoop)
-    unitdata.kv().set('extended.status', 'HA')
-    unitdata.kv().flush(True)
-    if data_changed('zookeeper.nodes', zookeeper_nodes):
-        hdfs.configure_zookeeper(zookeeper_nodes)
+    zk_nodes = sorted(zookeeper.zookeepers(), key=itemgetter('host'))
+    zk_started = is_state('namenode.zk.started')
+    hdfs.configure_zookeeper(zk_nodes)
+    if zk_started and data_changed('namenode.zk', zk_nodes):
         hdfs.restart_zookeeper()
-        set_state('zookeeper.configured')
 
 
-@when('namenode.started', 'namenode-cluster.joined', 'journalnodes.initialized', 'zookeeper.formatted')
+@when('namenode.ha.initialized')
+@when('zookeeper.ready')
+@when_not('leadership.set.zk-formatted')
+@when('leadership.is_leader')
+def format_zookeeper(zookeeper):
+    update_zk_config(zookeeper)  # ensure config is up to date
+    hadoop = get_hadoop_base()
+    hdfs = HDFS(hadoop)
+    hdfs.format_zookeeper()
+    leadership.leader_set({'zk-formatted': 'true'})
+
+
+@when('zookeeper.ready')
+@when('leadership.set.zk-formatted')
+@when_not('namenode.zk.started')
+def start_zookeeper(zookeeper):
+    hadoop = get_hadoop_base()
+    hdfs = HDFS(hadoop)
+    hdfs.start_zookeeper()
+    set_state('namenode.zk.started')
+
+
 @when_not('zookeeper.ready')
-def departed_zookeeper(cluster):
+@when('namenode.zk.started')
+def stop_zookeeper():
     hadoop = get_hadoop_base()
     hdfs = HDFS(hadoop)
     hdfs.stop_zookeeper()
-    remove_state('zookeeper.formatted')
-    remove_state('zookeeper.configured')
-    unitdata.kv().set('extended.status', 'HA degraded, zookeeper gone away')
-    unitdata.kv().flush(True)
-
-
-@when('namenode.started', 'namenode-cluster.joined', 'zookeeper.formatted', 'start.namenode')
-def finalize_ha_setup(cluster):
-    hadoop = get_hadoop_base()
-    hdfs = HDFS(hadoop)
-    hdfs.start_namenode()
-    if hookenv.is_leader():
-        cluster.jns_init()
-        unitdata.kv().set('extended.status', 'HA')
-        unitdata.kv().flush(True)
-    remove_state('start.namenode')
-
-
-@when('datanode.journalnode.joined', 'dn.queue.restart', 'namenode.standby.bootstrapped')
-@when_not('hdfs.degraded')
-def queue_datanode_restart(datanode, *args):
-    datanode.queue_restart()
-    unitdata.kv().set('extended.status', 'HA')
-    unitdata.kv().flush(True)
-    remove_state('dn.queue.restart')
-
-
-'''
-The following block and method will probably need to be modified
-to send clustered namenodes etc, as the current accept_clients
-block and method does - the states will need to be changed as
-currently it does not fire
-'''
-@when('namenode.ready', 'namenode.clients', 'namenode-cluster.initialized', 'non.existent.blocking.state')
-def accept_clients_ha(clients):
-    hadoop = get_hadoop_base()
-    local_hostname = hookenv.local_unit().replace('/', '-')
-    hdfs_port = hadoop.dist_config.port('namenode')
-    webhdfs_port = hadoop.dist_config.port('nn_webapp_http')
-
-    clients.send_spec(hadoop.spec())
-    # How to handle send_namenodes here?
-    clients.send_clustername(hookenv.service_name())
-    clients.send_namenodes([local_hostname])
-    clients.send_ports(hdfs_port, webhdfs_port)
-    clients.send_hosts_map(utils.get_kv_hosts())
-    clients.send_ready(True)
-
-
-@when('namenode.started', 'datanode.departing', 'namenode-cluster.initialized')
-@when_not('hdfs.degraded')
-def unregister_datanode_ha(datanode, cluster):
-    hadoop = get_hadoop_base()
-    hdfs = HDFS(hadoop)
-    hdfs_port = hadoop.dist_config.port('namenode')
-
-    slaves = unitdata.kv().get('namenode.slaves', [])
-    slaves_leaving = datanode.nodes()  # only returns nodes in "leaving" state
-    hookenv.log('Slaves leaving: {}'.format(slaves_leaving))
-
-    slaves_remaining = list(set(slaves) - set(slaves_leaving))
-    unitdata.kv().set('namenode.slaves', slaves_remaining)
-    # need to handle HA here (i.e. register slaves won't work if a namenode is down)
-    start = time.time()
-    while time.time() - start < 120:
-        if cluster.check_peer_port(hdfs_port):
-            unitdata.kv().set('namenode.slaves', slaves)
-            hdfs.register_slaves(slaves_remaining)
-            hdfs.reload_slaves()
-            return True
-        else:
-            hookenv.status_set('waiting', 'HDFS HA degraded - waiting for peer...')
-            set_state('hdfs.degraded')
-        time.sleep(2)
-    raise TimeoutError('Timed out waiting for other namenode')
-
-    utils.remove_kv_hosts(slaves_leaving)
-    utils.manage_etc_hosts()
-
-    if not slaves_remaining:
-        hookenv.status_set('blocked', 'Waiting for relation to DataNodes')
-        remove_state('namenode.ready')
-
-    datanode.dismiss()
+    remove_state('namenode.zk.started')
