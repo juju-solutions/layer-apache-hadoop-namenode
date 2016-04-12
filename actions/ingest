@@ -1,0 +1,18 @@
+#!/bin/bash
+
+if ! charms.reactive is_state 'namenode.ready'; then
+    action-fail 'NameNode is not yet ready'
+    exit
+fi
+
+dest_dir=$(action-get dest_dir)
+
+hadoop fs -mkdir -p "$dest_dir"
+for url in $(action-get url); do
+    # doesn't handle fragments or query params
+    filename=${url##*/}
+    if ! wget $url -O - | hadoop fs -put - "$dest_dir/$filename"; then
+        action-fail "Failed to ingest $url"
+        exit
+    fi
+done
