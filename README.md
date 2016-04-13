@@ -114,8 +114,8 @@ do **both** of the following (the order does not matter):
 
 For example:
 
-    juju add-relation hdfs-master ganglia:master
-    juju set hdfs-master ganglia_metrics=true
+    juju add-relation namenode ganglia:master
+    juju set namenode ganglia_metrics=true
 
 Enabling monitoring will issue restart the NameNode and all DataNode components
 on all of the related compute-slaves.  Take care to ensure that there are no
@@ -154,8 +154,8 @@ Setting this option will cause all resources required by this charm to be
 downloaded from the configured URL.
 
 You can fetch the resources for all of the Apache Hadoop charms
-(`apache-hadoop-hdfs-master`, `apache-hadoop-yarn-master`,
-`apache-hadoop-hdfs-secondary`, `apache-hadoop-plugin`, etc) into a single
+(`apache-hadoop-namenode`, `apache-hadoop-resourcemanager`,
+`apache-hadoop-slave`, `apache-hadoop-plugin`, etc) into a single
 directory and serve them all with a single `juju-resources serve` instance.
 
 

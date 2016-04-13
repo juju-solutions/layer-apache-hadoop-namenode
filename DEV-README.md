@@ -28,35 +28,9 @@ Information on this interface can be found at [interface-hdfs][hdfs]
 
 ### ganglia (interface: [monitor][])
 
-This relation connects this charm to the [Ganglia][] charm for monitoring. 
+This relation connects this charm to the [Ganglia][] charm for monitoring.
 Information on this interface can be found at [interface-monitor][monitor]
 
 [hdfs]: https://github.com/juju-solutions/interface-hdfs
 [monitor]: https://github.com/juju-solutions/interface-monitor
 [Ganglia]: https://jujucharms.com/ganglia/
-
-
-## Manual Deployment
-
-The easiest way to deploy an Apache Hadoop platform is to use one of
-the [apache bundles](https://jujucharms.com/u/bigdata-charmers/#bundles).
-However, to manually deploy the base Apache Hadoop platform without using one
-of the bundles, you can use the following:
-
-    juju deploy apache-hadoop-hdfs-master hdfs-master
-    juju deploy apache-hadoop-hdfs-secondary secondary-namenode
-    juju deploy apache-hadoop-yarn-master yarn-master
-    juju deploy apache-hadoop-compute-slave compute-slave -n3
-    juju deploy apache-hadoop-plugin plugin
-
-    juju add-relation yarn-master hdfs-master
-    juju add-relation secondary-namenode hdfs-master
-    juju add-relation compute-slave yarn-master
-    juju add-relation compute-slave hdfs-master
-    juju add-relation plugin yarn-master
-    juju add-relation plugin hdfs-master
-
-This will create a scalable deployment with separate nodes for each master,
-and a three unit compute slave (NodeManager and DataNode) cluster.  The master
-charms also support co-locating using the `--to` option to `juju deploy` for
-more dense deployments.
