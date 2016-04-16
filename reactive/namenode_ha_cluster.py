@@ -43,7 +43,6 @@ def enable_ha(cluster):
 
 @when('leadership.set.ha-initialized')
 @when('namenode-cluster.joined')
-@when_not('leadership.is_leader')
 def check_cluster_health(cluster):
     cluster_roles = set(utils.ha_node_state(node)
                         for node in get_cluster_nodes())
