@@ -142,6 +142,7 @@ def init_ha_standby(datanode, cluster):
     hdfs.bootstrap_standby()
     hdfs.start_namenode()
     cluster.standby_ready()
+    hadoop.open_ports('namenode')
     set_state('namenode.started')
 
 
