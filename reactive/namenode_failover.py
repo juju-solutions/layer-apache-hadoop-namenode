@@ -38,8 +38,10 @@ def format_zookeeper(zookeeper):
 @when('leadership.set.zk-formatted')
 @when_not('namenode.zk.started')
 def start_zookeeper(zookeeper):
+    update_zk_config(zookeeper)  # ensure config is up to date
     hadoop = get_hadoop_base()
     hdfs = HDFS(hadoop)
+    hdfs.restart_namenode()
     hdfs.start_zookeeper()
     set_state('namenode.zk.started')
 
