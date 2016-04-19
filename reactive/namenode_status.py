@@ -30,7 +30,8 @@ def report_status(datanode):
     ha = is_state('leadership.set.namenode-ha')
     pending_ha = not ha and is_state('namenode-cluster.joined')
     standalone = started and not pending_ha and not ha
-    clustered = is_state('namenode.cluster.healthy')
+    clustered = is_state('namenode-cluster.joined')
+    healthy = is_state('namenode.cluster.healthy')
     quorum = is_state('journalnode.quorum')
     failover = 'automatic' if is_state('zookeeper.ready') else 'manual'
     degraded = ha and not all([clustered, quorum])
@@ -57,6 +58,7 @@ def report_status(datanode):
         missing = ' and '.join(filter(None, [
             'NameNode' if not clustered else None,
             'JournalNodes' if not quorum else None,
+            'active' if clustered and quorum and not healthy else None,
         ]))
         extra = '{} {} (missing: {}), with {} fail-over'.format(
             condition, role, missing, failover)
