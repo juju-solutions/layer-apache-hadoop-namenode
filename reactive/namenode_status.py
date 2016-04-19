@@ -34,7 +34,7 @@ def report_status(datanode):
     healthy = is_state('namenode.cluster.healthy')
     quorum = is_state('journalnode.quorum')
     failover = 'automatic' if is_state('zookeeper.ready') else 'manual'
-    degraded = ha and not all([clustered, quorum])
+    degraded = ha and not all([clustered, healthy, quorum])
     if started:
         pending_role = 'active'
     elif chosen:
