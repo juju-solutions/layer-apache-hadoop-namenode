@@ -36,6 +36,7 @@ def format_zookeeper(zookeeper):
 
 @when('zookeeper.ready')
 @when('leadership.set.zk-formatted')
+@when('namenode-cluster.standby.ready')
 @when_not('namenode.zk.started')
 def start_zookeeper(zookeeper):
     update_zk_config(zookeeper)  # ensure config is up to date
