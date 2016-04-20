@@ -1,6 +1,7 @@
 from operator import itemgetter
 from charms.reactive import when
 from charms.reactive import when_not
+from charms.reactive import when_any
 from charms.reactive import is_state
 from charms.reactive import set_state
 from charms.reactive import remove_state
@@ -36,7 +37,7 @@ def format_zookeeper(zookeeper):
 
 @when('zookeeper.ready')
 @when('leadership.set.zk-formatted')
-@when('namenode-cluster.standby.ready')
+@when_any('namenode-cluster.standby.ready', 'namenode.standby')
 @when_not('namenode.zk.started')
 def start_zookeeper(cluster, zookeeper):
     update_zk_config(zookeeper)  # ensure config is up to date
