@@ -46,8 +46,9 @@ def enable_ha(cluster):
 def check_cluster_health(cluster):
     cluster_roles = set(utils.ha_node_state(node)
                         for node in get_cluster_nodes())
-    toggle_state('namenode.cluster.healthy',
-                 cluster_roles == {'active', 'standby'})
+    healthy = cluster_roles == {'active', 'standby'}
+    toggle_state('namenode.cluster.healthy', healthy)
+    toggle_state('namenode.ready', healthy)
 
 
 @when('leadership.set.cluster-activated')
@@ -135,6 +136,10 @@ def init_ha_standby(datanode, cluster):
     """
     Once initial HA setup is done, any new NameNode is started as standby.
     """
+    local_hostname = hookenv.local_unit().replace('/', '-')
+    if local_hostname not in get_cluster_nodes():
+        # can't even bootstrapStandby if not in the list of chosen nodes
+        return
     update_ha_config(datanode)  # ensure the config is written
     hadoop = get_hadoop_base()
     hdfs = HDFS(hadoop)

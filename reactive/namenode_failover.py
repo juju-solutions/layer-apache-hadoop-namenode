@@ -39,7 +39,7 @@ def format_zookeeper(zookeeper):
 @when('leadership.set.zk-formatted')
 @when_any('namenode-cluster.standby.ready', 'namenode.standby')
 @when_not('namenode.zk.started')
-def start_zookeeper(cluster, zookeeper):
+def start_zookeeper(zookeeper):
     update_zk_config(zookeeper)  # ensure config is up to date
     hadoop = get_hadoop_base()
     hdfs = HDFS(hadoop)

@@ -25,45 +25,39 @@ def report_status(datanode):
     num_slaves = len(datanode.nodes())
     local_hostname = hookenv.local_unit().replace('/', '-')
     chosen_nodes = get_cluster_nodes()
+    cluster_roles = set(utils.ha_node_state(node) for node in chosen_nodes)
     chosen = local_hostname in chosen_nodes
     started = is_state('namenode.started')
     ha = is_state('leadership.set.namenode-ha')
-    pending_ha = not ha and is_state('namenode-cluster.joined')
-    standalone = started and not pending_ha and not ha
     clustered = is_state('namenode-cluster.joined')
-    healthy = is_state('namenode.cluster.healthy')
+    active = 'active' in cluster_roles
+    standby = 'standby' in cluster_roles
+    healthy = active and standby
     quorum = is_state('journalnode.quorum')
     failover = 'automatic' if is_state('zookeeper.ready') else 'manual'
-    degraded = ha and not all([clustered, healthy, quorum])
-    if started:
-        pending_role = 'active'
-    elif chosen:
-        pending_role = 'standby'
-    else:
-        pending_role = 'standby or extra'
-    if chosen:
-        ha_role = utils.ha_node_state(local_hostname) or 'down'
-    else:
-        ha_role = 'extra'
+    degraded = ha and not all([clustered, quorum, healthy])
 
-    if standalone:
-        extra = 'standalone'
-    elif ha and not degraded:
-        extra = '{}, with {} fail-over'.format(ha_role, failover)
-    elif (ha and degraded) or pending_ha:
-        if pending_ha:
-            clustered = is_state('namenode-cluster.joined')
-        condition = 'pending' if pending_ha else 'degraded'
-        role = pending_role if pending_ha else ha_role
-        missing = ' and '.join(filter(None, [
-            'NameNode' if not clustered else None,
-            'JournalNodes' if not quorum else None,
-            'active' if clustered and quorum and not healthy else None,
-        ]))
-        extra = '{} {} (missing: {}), with {} fail-over'.format(
-            condition, role, missing, failover)
+    if not ha:
+        if started:
+            extra = 'standalone'
+        else:
+            extra = 'down'
     else:
-        extra = 'unknown'
+        if chosen:
+            role = utils.ha_node_state(local_hostname) or 'down'
+        else:
+            role = 'extra'
+        if not degraded:
+            extra = '{}, with {} fail-over'.format(role, failover)
+        else:
+            missing = ' and '.join(filter(None, [
+                'NameNode' if not clustered else None,
+                'JournalNodes' if not quorum else None,
+                'active' if not active else None,
+                'standby' if not standby else None,
+            ]))
+            extra = 'degraded {} (missing: {}), with {} fail-over'.format(
+                role, missing, failover)
     hookenv.status_set('active', 'Ready ({count} DataNode{s}, {extra})'.format(
         count=num_slaves,
         s='s' if num_slaves > 1 else '',

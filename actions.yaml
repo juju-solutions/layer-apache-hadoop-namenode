@@ -1,3 +1,7 @@
+stop-namenode:
+    description: Stop the NameNode service on this unit
+start-namenode:
+    description: Start the NameNode service on this unit
 start-hdfs:
     description: All of the HDFS processes can be started with this Juju action.
 stop-hdfs:
@@ -8,7 +12,7 @@ smoke-test:
     description: Verify that HDFS is working by creating and removing a small file.
 nnbench:
     description: Load test the NameNode hardware and configuration
-    params: 
+    params:
         maps:
                 description: number of map jobs
                 type: integer
@@ -28,7 +32,7 @@ nnbench:
         numfiles:
                 description: number of files
                 type: integer
-                default: 0 
+                default: 0
         repfactor:
                 description: replication factor per file
                 type: integer
@@ -39,16 +43,16 @@ nnbench:
                 default: "/benchmarks/NNBench"
 testdfsio:
     description: DFS IO Testing
-    params: 
+    params:
         mode:
                 description: read or write IO test
                 type: string
                 default: "write"
                 enum: [read,write]
         numfiles:
-                description: number of files 
+                description: number of files
                 type: integer
-                default: 10 
+                default: 10
         filesize:
                 description: filesize in MB
                 type: integer
@@ -60,4 +64,4 @@ testdfsio:
         buffersize:
                 description: Buffer size in bytes
                 type: integer
-                default: 1000000 
+                default: 1000000
