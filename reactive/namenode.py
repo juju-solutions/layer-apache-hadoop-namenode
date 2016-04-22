@@ -44,7 +44,7 @@ def install_ssh_key():
     ssh_dir = utils.ssh_key_dir('hdfs')
     ssh_dir.makedirs_p()
     authfile = ssh_dir / 'authorized_keys'
-    authfile.write_lines(leadership.leader_get('ssh-key-pub'), append=True)
+    authfile.write_lines([leadership.leader_get('ssh-key-pub')], append=True)
 
 
 @when('datanode.joined')
