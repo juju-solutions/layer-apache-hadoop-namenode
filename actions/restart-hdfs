@@ -5,7 +5,10 @@ if ! charms.reactive is_state 'namenode.ready'; then
     exit
 fi
 
-. /etc/environment
-cd ${HADOOP_HOME}/sbin
-su hdfs -c "./stop-dfs.sh"
-su hdfs -c "./start-dfs.sh"
+if command -v systemctl >/dev/null; then
+  # assume systemd
+  systemctl restart namenode
+elif command -v service >/dev/null; then
+  # assume upstart
+  service namenode restart
+fi
