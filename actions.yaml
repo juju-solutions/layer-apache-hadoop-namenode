@@ -1,3 +1,7 @@
+stop-namenode:
+    description: Stop the NameNode service on this unit
+start-namenode:
+    description: Start the NameNode service on this unit
 ingest:
   description: Ingest a file from a URL into HDFS.
   params:
