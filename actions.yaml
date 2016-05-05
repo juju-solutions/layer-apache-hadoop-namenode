@@ -1,3 +1,29 @@
+backup-hdfs:
+    description: Use distcp to copy HDFS from this cluster to Destination
+    params:
+        dest:
+            description: Destination namenode
+            type: string
+        srcpath:
+            description: Source path to copy from
+            type: string
+            default: '/'
+        destpath:
+            description: Destination path to copy to
+            type: string
+            default: '/'
+        overwrite:
+            description: Overwrites target-files that exist at the target. Overrides 'update'
+            type: boolean
+            default: false
+        update:
+            description: Copy files from source that don’t exist at the target or differ from the target version 
+            type: boolean
+            default: true 
+        options:
+            description: Additional command line params to append to distcp command
+            type: string
+    required: ['dest']
 stop-namenode:
     description: Stop the NameNode service on this unit
 start-namenode:
