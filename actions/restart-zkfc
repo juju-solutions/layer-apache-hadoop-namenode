@@ -1,0 +1,12 @@
+#!/bin/bash
+
+if ! charms.reactive is_state 'namenode.ready'; then
+    action-fail 'NameNode not yet ready'
+    exit
+fi
+
+. /etc/environment
+cd ${HADOOP_HOME}/sbin
+su hdfs -c "./hadoop-daemon.sh stop zkfc"
+su hdfs -c "./hadoop-daemon.sh start zkfc"
+
