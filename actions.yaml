@@ -12,6 +12,14 @@ backup-hdfs:
             description: Destination path to copy to
             type: string
             default: '/'
+        srcport:
+            description: HDFS source port
+            type: string
+            default: "8020"
+        destport:
+            description: HDFS destination port
+            type: string
+            default: "8020"
         overwrite:
             description: Overwrites target-files that exist at the target. Overrides 'update'
             type: boolean

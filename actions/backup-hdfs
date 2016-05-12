@@ -20,14 +20,6 @@ elif [ "${update}" == "True" ] ; then
         options="$options -update"
 fi
 
-if [ "${srcport}" == "" ] ; then
-        srcport='8020'
-fi
-
-if [ "${destport}" == "" ] ; then
-        destport='8020'
-fi
-
 commandstr="hadoop distcp $options hdfs://$(hostname):${srcport}/${srcpath} hdfs://${dest}:${destport}/${destpath}"
 su hdfs -c "${commandstr}"
 
