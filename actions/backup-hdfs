@@ -1,0 +1,26 @@
+#!/bin/bash
+set -e 
+if ! charms.reactive is_state 'namenode.ready'; then
+    action-fail 'NameNode is not yet ready'
+    exit
+fi
+
+dest=$(action-get dest)
+srcpath=$(action-get srcpath)
+srcport=$(action-get srcport)
+destpath=$(action-get destpath)
+destport=$(action-get destport)
+overwrite=$(action-get overwrite)
+update=$(action-get update)
+options=$(action-get options)
+
+if [ "${overwrite}" == "True" ] ; then
+        options="$options -overwrite"
+elif [ "${update}" == "True" ] ; then
+        options="$options -update"
+fi
+
+commandstr="hadoop distcp $options hdfs://$(hostname):${srcport}/${srcpath} hdfs://${dest}:${destport}/${destpath}"
+su hdfs -c "${commandstr}"
+
+action-set result="Distcp mapreduce job submitted, see hdfs/yarn logs for job info"

@@ -122,6 +122,43 @@ on all of the related compute-slaves.  Take care to ensure that there are no
 running jobs when enabling monitoring.
 
 
+## Backup / HDFS export
+
+This charm has an action called 'backup-hdfs' which will perform a distcp to
+a destination hadoop namenode. By default, the entire hdfs fs will be copied
+with the -update flag, meaning any non-existing files will be copied, and
+any different files will be overwritten. If the destination namenode is another
+juju deployment, be sure to run the command: 'juju expose namenode/?'. Otherwise
+make sure any firewalls are opened.
+
+  * The 'dest' param is mandatory and contains an ip or resolvable hostname for
+the destination hadoop namenode.
+
+Example usage:
+
+    juju action do namenode/0 backup-hdfs dest='10.0.0.100'
+
+This will run the following hadoop command as the hdfs user:
+
+     hadoop distcp -update hdfs://namenode-0:8020/ hdfs://10.0.0.100:8020/o
+
+Other supported params are:
+
+  * srcpath: Specify a different source path to the default of /
+  * srcport: Specify a different HDFS port to the default of 8020
+  * destpath: Equivalent to srcpath for the destination
+  * destport: Equivalent to srcport for the destination
+  * update: Boolean, defaults to true, update files and create new files
+  * overwrite: Boolean, defaults to false, overrides update, copies everything
+  * options: Additional command line params to pass to the hadoop distcp command
+
+If both update and overwrite are false, a standard distcp job will run.
+
+
+Refer to apache distcp docs for further details:
+[Hadoop 2.7.2 distcp docs](https://hadoop.apache.org/docs/r2.7.2/hadoop-distcp/DistCp.html).
+
+
 ## Deploying in Network-Restricted Environments
 
 The Apache Hadoop charms can be deployed in environments with limited network
