@@ -20,3 +20,4 @@ requires:
 peers:
   namenode-cluster:
     interface: namenode-cluster
+series: ['xenial', 'trusty']
